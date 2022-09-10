@@ -1,0 +1,6 @@
+transformers==4.10
+tqdm
+absl-py
+sklearn
+datasets
+csv
