@@ -600,7 +600,7 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
             model_label_metadata_ids, model_target_labels_ids)
 
 
-def get_relevance_dataloader_input(examples_data, vocab_file):
+def get_relevance_dataloader_input(examples_data, vocab_file, disable_tqdm=True):
     prepare_vocab_object = PREPAREVOCAB(vocab_file)
     sep_token = '[SEP]_'
     sep_token_id = prepare_vocab_object.convert_by_vocab([sep_token])[0]
@@ -608,7 +608,7 @@ def get_relevance_dataloader_input(examples_data, vocab_file):
     model_segment_ids = []
     model_input_mask = []
     model_labels_ids = []
-    for i, example_instance in enumerate(examples_data):
+    for i, example_instance in enumerate(tqdm(examples_data, desc="Preparing relevance data", disable=disable_tqdm)):
         instance_input_ids = []
         instance_segment_ids = []
         instance_input_mask = []

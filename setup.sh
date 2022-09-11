@@ -8,6 +8,7 @@ mkdir finetuned_ckpts
 mv model_ckpts.zip finetuned_ckpts
 cd finetuned_ckpts
 unzip model_ckpts.zip
+cd ..
 
 echo "Installing requirements."
 pip3 install -r requirements.txt

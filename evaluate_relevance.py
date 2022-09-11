@@ -31,7 +31,7 @@ def get_relevance_model_performance(vocab_file):
     model.load_state_dict(torch.load(FLAGS.model_checkpoint_path, map_location=DEVICE))
 
     model_input_ids, model_segment_ids, model_input_mask, model_labels_ids = get_relevance_dataloader_input(examples_data,
-                                                                                                            vocab_file)
+                                                                                                            vocab_file, False)
     eval_relevance_data_loader, _ = get_relevance_dataloader(
         model_input_ids,
         model_input_mask,
