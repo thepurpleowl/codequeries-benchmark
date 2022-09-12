@@ -43,7 +43,7 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     "setting",
     "ideal",
-    "ideal/file_ideal/sliding_window/twostep"
+    "ideal/file_ideal/prefix/sliding_window/twostep"
 )
 
 flags.DEFINE_integer(

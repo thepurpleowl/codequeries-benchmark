@@ -40,13 +40,13 @@ def get_relevance_model_performance(vocab_file):
     )
 
     eval_relevance_out, eval_relevance_targets = eval_fn_relevance_prediction(
-        eval_relevance_data_loader, model, DEVICE)
+        eval_relevance_data_loader, model, DEVICE, False)
 
     assert len(eval_relevance_targets) == len(eval_relevance_out)
 
     scores = precision_recall_fscore_support(eval_relevance_targets, eval_relevance_out)
     relevance_accuracy = accuracy_score(eval_relevance_targets, eval_relevance_out)
-    print(scores)
+    # print(scores)
     print("Accuracy: ", relevance_accuracy, "Precision: ", scores[0][1], ", Recall: ", scores[1][1])
 
 

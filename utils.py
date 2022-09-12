@@ -236,12 +236,12 @@ def eval_fn(data_loader, model, device):
     return target_sequences, output_sequences, total_loss
 
 
-def eval_fn_relevance_prediction(data_loader, model, device):
+def eval_fn_relevance_prediction(data_loader, model, device, disable_tqdm=True):
     model.eval()
     fin_targets = []
     fin_outputs = []
     with torch.no_grad():
-        for d in tqdm(data_loader, total=len(data_loader), desc="Relevance evaluation"):
+        for d in tqdm(data_loader, total=len(data_loader), desc="Relevance evaluation", disable=disable_tqdm):
             ids = d["ids"]
             token_type_ids = d["token_type_ids"]
             mask = d["mask"]
