@@ -1,14 +1,14 @@
-# Codequeries-Benchmark
+# CodeQueries Benchmark
 
-The repo provides scripts to reproduce the important results of [preprint](arxiv link). The scripts can be used get performance metric on proposed approach for Codequeries Benchmark.
+The repo provides scripts to reproduce the important results of [preprint](arxiv link). The scripts can be used get performance metric on proposed approach for the CodeQueries Benchmark.
 
-More details on curated dataset for this benchmark is available on [huggingface](https://huggingface.co/datasets/thepurpleowl/codequeries).
+More details on the curated dataset for this benchmark are available on [huggingface](https://huggingface.co/datasets/thepurpleowl/codequeries).
 
 ### Steps
 -----------
-1. Clone the repo in virtual environment.
+1. Clone the repo in a virtual environment.
 2. Run `setup.sh` to setup the workspace.
-3. Run the following command to get performance metric values.   
+3. Run the following commands to get performance metric values.   
 **For span prediction**  
 `python evaluate_spanprediction.py --example_types_to_evaluate=<positive/negative/all> --setting=<ideal/file_ideal/prefix/sliding_window/twostep>`  
 **For relevance prediction**  
