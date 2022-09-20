@@ -1,6 +1,6 @@
 # CodeQueries Benchmark
 
-The repo provides scripts to reproduce the important results of [preprint](arxiv link). The scripts can be used get performance metric on proposed approach for the CodeQueries Benchmark.
+The repo provides scripts to reproduce the important results of [Learning to Answer Semantic Queries over Code](https://arxiv.org/abs/2209.08372). The scripts can be used get performance metric on proposed approach for the CodeQueries Benchmark.
 
 More details on the curated dataset for this benchmark are available on [huggingface](https://huggingface.co/datasets/thepurpleowl/codequeries).
 
@@ -34,3 +34,18 @@ More details on the curated dataset for this benchmark are available on [hugging
 | Model name                  | Precision     | Recall       | Accuracy     |
 |-----------------------------|---------------|--------------|--------------|
 | Relevance Classification    | 95.73         | 90.10        | 96.38        |
+
+##### BibTeX entry and citation info
+-----------
+```
+@misc{https://doi.org/10.48550/arxiv.2209.08372,
+  doi = {10.48550/ARXIV.2209.08372},  
+  url = {https://arxiv.org/abs/2209.08372},  
+  author = {Sahu, Surya Prakash and Mandal, Madhurima and Bharadwaj, Shikhar and Kanade, Aditya and Maniatis, Petros and Shevade, Shirish},  
+  keywords = {Software Engineering (cs.SE), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},  
+  title = {Learning to Answer Semantic Queries over Code},  
+  publisher = {arXiv},  
+  year = {2022},  
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+```
