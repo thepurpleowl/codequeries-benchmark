@@ -98,7 +98,7 @@ class OpenAIModelHandler:
 
     def get_response(self, input, instructions=None, **kwargs):
         
-        config = self.config | kwargs
+        config = self.config
         if self.openai_api_type == "azure":
             config["engine"] = config["model"]
 

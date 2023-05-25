@@ -40,7 +40,7 @@ model_config = {
 }
 
 experiment_config = {
-    "Target_folder": "test_dir_file_v3",
+    "Target_folder": "test_dir_file_bm25",
     "encoding":'UTF-8',
     "timeout": 8,
     "prompt_batch_size": 1,  # prompt_batch_size * max_tokens allowed in model < RateLimit (62*4000<250000)
@@ -66,7 +66,7 @@ model_handler = OpenAIModelHandler(
 )
 
 prompt_constructor = PromptConstructor(
-    template_path="span_highlight_V3.j2",
+    template_path="prompt_templates/span_highlight_V3.j2",
     model=model_config["model"],
 )
 
@@ -126,42 +126,41 @@ def get_file_level_prompt_input_from_metadata(query, file_path, sampled_querywis
 def get_filename(fn):
     return '_'.join(fn.split('/'))
 
-def get_examples_for_prompt(pos_ex, neg_ex, bm25_db_pos, bm25_db_neg, input_code):
+def get_examples_for_prompt(pos_exes, neg_exes, bm25_db_pos, bm25_db_neg, input_code):
     tokenized_input_code = input_code.split(" ")
 
     pos_ex_scores = bm25_db_pos.get_scores(tokenized_input_code)
     neg_ex_scores = bm25_db_neg.get_scores(tokenized_input_code)
-    selected_pos_index = pos_ex_scores.argmax(axis=1) # check if numpy array
-    selected_neg_index = neg_ex_scores.argmax(axis=1) # check if numpy array
-    assert not neg_ex[selected_neg_index]['answer_spans']
-    assert not neg_ex[selected_neg_index]['supporting_fact_spans']
+    selected_pos_index = int(pos_ex_scores.argmax())
+    selected_neg_index = int(neg_ex_scores.argmax())
+    assert not neg_exes[selected_neg_index]['answer_spans']
+    assert not neg_exes[selected_neg_index]['supporting_fact_spans']
 
-    return pos_ex[selected_pos_index], neg_ex[selected_neg_index]
+    return pos_exes[selected_pos_index], neg_exes[selected_neg_index]
 
-def get_bm25_dbs(pos_ex, neg_ex):
-    tokenized_pos_corpus = [get_sanitized_content(cb).split(" ") for cb in pos_ex['context_blocks']]
-    tokenized_neg_corpus = [get_sanitized_content(cb).split(" ") for cb in neg_ex['context_blocks']]
+def get_bm25_dbs(pos_exes, neg_exes):
+    tokenized_pos_corpus = [get_sanitized_content(cbs).split(" ") for cbs in pos_exes['context_blocks']]
+    tokenized_neg_corpus = [get_sanitized_content(cbs).split(" ") for cbs in neg_exes['context_blocks']]
 
     bm25_db_pos = BM25Okapi(tokenized_pos_corpus)
     bm25_db_neg = BM25Okapi(tokenized_neg_corpus)
 
     return bm25_db_pos, bm25_db_neg
 
-def run2():
+def run():
     with open('resources/sampled_test_data.pkl', 'rb') as f: 
         sampled_querywise_files = pickle.load(f)
-    with open('resources/partitioned_data_all.pkl', 'rb') as f: 
-        partitioned_data_all = pickle.load(f)
     with open('resources/partitioned_data_train_1000.pkl', 'rb') as f: 
         partitioned_data_train_1000 = pickle.load(f)
 
     with open('resources/query_folderName_map.pkl', 'rb') as f:
         query_folderName_map = pickle.load(f)
+    db_example_threshold =1000
 
     Logger = Log()
     all_queries = list(sampled_querywise_files.keys())
     for query in tqdm(all_queries):
-        logger.info(f'here is the current query: {query}')
+        logger.info(f'Current query: {query}')
         query_folderName = query_folderName_map[query]
         if not Path(experiment_config["Target_folder"]+f"/logs").exists():
             os.makedirs(experiment_config["Target_folder"]+f"/logs")
@@ -170,15 +169,19 @@ def run2():
 
         sampled_files = list(sampled_querywise_files[query].keys())
         
-        pos_ex = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 1)
-        neg_ex = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 0)
-        bm25_db_pos, bm25_db_neg = get_bm25_dbs(pos_ex, neg_ex)
+        pos_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 1 and x["file_tokens"] < 500)
+        neg_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 0 and x["file_tokens"] < 500)
+        # if pos_exes.shape[0] > db_example_threshold:
+        #     pos_exes = pos_exes.shuffle(seed=42).select(range(db_example_threshold))
+        # if neg_exes.shape[0] > db_example_threshold:
+        #     neg_exes = neg_exes.shuffle(seed=42).select(range(db_example_threshold))
+        bm25_db_pos, bm25_db_neg = get_bm25_dbs(pos_exes, neg_exes)
 
         processed_rows = []
         i = 0
-        for file_path in sampled_files:
+        for file_path in tqdm(sampled_files):
             prompt_input = get_file_level_prompt_input_from_metadata(query, file_path, sampled_querywise_files)
-            pos_ex, neg_ex = get_examples_for_prompt(pos_ex, neg_ex, bm25_db_pos, bm25_db_neg, prompt_input['input_code'])
+            pos_ex, neg_ex = get_examples_for_prompt(pos_exes, neg_exes, bm25_db_pos, bm25_db_neg, prompt_input['input_code'])
             example_values = get_examples_values(query, pos_ex, neg_ex) 
             for k in example_values:
                 prompt_input[k] = example_values[k]
@@ -206,4 +209,4 @@ def run2():
                         processed_rows)
         
 if __name__ == "__main__":
-    run2()
+    run()
