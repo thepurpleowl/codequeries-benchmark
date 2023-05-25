@@ -13,13 +13,14 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MAX_LEN = 1024
 MAX_LEN_RELEVANCE = 512
 SECOND_LAYER_HIDDEN_SIZE = 2048
-BATCH = 4
-RELEVANCE_BATCH = 16
+TRAIN_BATCH_SIZE = 4
+BATCH = 1
+RELEVANCE_BATCH = 4
 DROPOUT = 0.1
 LEARNING_RATE = 3e-5
 EPOCHS = 3
 NUM_WARMUP_STEPS = 0
-
+RELEVANCE_WEIGHTS = torch.FloatTensor([1, 2])
 CSV_FIELDS = ["Epoch", "Train_Loss", "Validation_Loss"]
 USE_WEIGHTS_IN_LOSS_FUNCTION = False
 RESULTS_FILE_PATH = "training_results_.csv"
@@ -188,6 +189,8 @@ def loss_fn(outputs, targets, batch, device):
         outputs.view(MAX_LEN * batch, NUMBER_OF_LABELS),
         targets.view(MAX_LEN * batch))
 
+def loss_fn_relevance_prediction(outputs, targets, device):
+    return nn.CrossEntropyLoss(weight=RELEVANCE_WEIGHTS.to(device))(outputs, targets.squeeze())
 
 def eval_fn(data_loader, model, device):
     model.eval()
@@ -195,7 +198,7 @@ def eval_fn(data_loader, model, device):
     accessing_output_sequence_for_first_time = 1
     total_loss = 0
     with torch.no_grad():
-        for d in tqdm(data_loader, total=len(data_loader)):
+        for d in tqdm(data_loader, total=len(data_loader), disable=True):
             ids = d["ids"]
             token_type_ids = d["token_type_ids"]
             mask = d["mask"]
@@ -232,6 +235,7 @@ def eval_fn(data_loader, model, device):
                                                    out.cpu().detach().numpy()), axis=0)
 
             b = out.view(out.shape[0] * out.shape[1])
+    total_loss = total_loss / len(data_loader)
 
     return target_sequences, output_sequences, total_loss
 
@@ -240,6 +244,7 @@ def eval_fn_relevance_prediction(data_loader, model, device, disable_tqdm=True):
     model.eval()
     fin_targets = []
     fin_outputs = []
+    total_loss = 0
     with torch.no_grad():
         for d in tqdm(data_loader, total=len(data_loader), desc="Relevance evaluation", disable=disable_tqdm):
             ids = d["ids"]
@@ -253,6 +258,9 @@ def eval_fn_relevance_prediction(data_loader, model, device, disable_tqdm=True):
             targets = targets.to(device)
 
             outputs = model(ids=ids, mask=mask, token_type_ids=token_type_ids)
+
+            loss = loss_fn_relevance_prediction(outputs, targets, device)
+            total_loss = total_loss + loss
 
             a = targets.data
             b = outputs.data                        # shape[batch, labels]
@@ -269,7 +277,8 @@ def eval_fn_relevance_prediction(data_loader, model, device, disable_tqdm=True):
             fin_outputs.extend(temp_b)
             fin_targets.extend(temp_a)
 
-    return fin_outputs, fin_targets
+    total_loss = total_loss / len(data_loader)
+    return fin_outputs, fin_targets, total_loss
 
 
 # training
@@ -295,6 +304,27 @@ def train_fn(data_loader, model, optimizer, device, scheduler):
         optimizer.step()
         scheduler.step()
 
+def train_fn_relevance_prediction(data_loader, model, optimizer, device, scheduler):
+    model.train()
+
+    for d in tqdm(data_loader, total=len(data_loader)):
+        ids = d["ids"]
+        token_type_ids = d["token_type_ids"]
+        mask = d["mask"]
+        targets = d["targets"]
+
+        ids = ids.to(device)
+        token_type_ids = token_type_ids.to(device)
+        mask = mask.to(device)
+        targets = targets.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(ids=ids, mask=mask, token_type_ids=token_type_ids)
+
+        loss = loss_fn_relevance_prediction(outputs, targets, device)
+        loss.backward()
+        optimizer.step()
+        scheduler.step()
 
 # utilities
 def get_first_sep_label_index(sequence):
@@ -324,7 +354,7 @@ def get_dataloader_input(examples_data, example_types_to_evaluate, setting, voca
     model_segment_ids = []
     model_input_mask = []
     model_labels_ids = []
-    for example_instance in tqdm(examples_data, desc="Preparing input"):
+    for example_instance in tqdm(examples_data, desc="Preparing input", disable=True):
         assert (len(example_instance['subtokenized_input_sequence'])
                 == len(example_instance['label_sequence']))
         if(not should_add_to_eval_set(example_instance,
@@ -536,7 +566,7 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
                 rel_i_segment_ids,
                 rel_i_labels_ids
             )
-            rel_i_out, rel_i_targets = eval_fn_relevance_prediction(rel_i_data_loader, relevance_model, DEVICE)
+            rel_i_out, rel_i_targets, _ = eval_fn_relevance_prediction(rel_i_data_loader, relevance_model, DEVICE)
 
         assert len(rel_i_out) == len(twostep_dict[twostep_key]) == len(rel_i_targets)
         # form span prediction examples
