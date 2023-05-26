@@ -75,11 +75,15 @@ def get_querywise_train_stat():
        assert ff in all_files
 
   print(dataset.shape[0], total)
-get_querywise_train_stat()
+# get_querywise_train_stat()
 # %%
-def sample_data(query_data, s=10):
-    pos_files = set(query_data.filter(lambda x: x["example_type"] == 1)['code_file_path'])
-    neg_files = set(query_data.filter(lambda x: x["example_type"] == 0)['code_file_path'])
+def sample_data(query_data, split, s=10):
+    if split =='train':
+      pos_files = set(query_data.filter(lambda x: x["example_type"] == 1)['code_file_path'])
+      neg_files = set(query_data.filter(lambda x: x["example_type"] == 0)['code_file_path'])
+    else:
+      pos_files = set(query_data.filter(lambda x: x["example_type"] == 1 and x['file_tokens'] <=2000)['code_file_path'])
+      neg_files = set(query_data.filter(lambda x: x["example_type"] == 0 and x['file_tokens'] <=2000)['code_file_path'])
     assert len(pos_files.intersection(neg_files)) == 0
 
     all_files = random.sample(pos_files, min(s, len(pos_files))) + random.sample(neg_files, min(s, len(neg_files)))
@@ -99,13 +103,13 @@ def sample_data(query_data, s=10):
     
     return metadata_with_spans
 
-def get_sampled_file_metadata(partitioned_data_path, output_path):
+def get_sampled_file_metadata(partitioned_data_path, output_path, split='train'):
   with open(partitioned_data_path, 'rb') as f: 
     partitioned_data = pickle.load(f)
 
   sampled_partitioned_data = {}
   for query in tqdm(all_queries):
-    sampled_partitioned_data[query] = sample_data(partitioned_data[query])
+    sampled_partitioned_data[query] = sample_data(partitioned_data[query], split)
 
   with open(output_path, 'wb') as f: 
       pickle.dump(sampled_partitioned_data, f)
@@ -124,5 +128,5 @@ def get_instances_for_files(sampled_data_path, dataset_setting, split):
       pickle.dump(filtered_data, f)
 
 if __name__ == '__main__':
-  get_sampled_file_metadata('resources/partitioned_data_all.pkl', 'resources/sampled_test_data.pkl')
-  get_sampled_file_metadata('resources/partitioned_data_train_all.pkl', 'resources/sampled_train_all_data.pkl')
+  get_sampled_file_metadata('resources/partitioned_data_all.pkl', 'resources/sampled_test_data.pkl', 'test')
+  # get_sampled_file_metadata('resources/partitioned_data_train_all.pkl', 'resources/sampled_train_all_data.pkl')

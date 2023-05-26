@@ -33,7 +33,7 @@ query_data, reccos_dict, desc_dict = extract_codeql_recommendation("resources/co
 model_config = {
     "engine": "gpt-35-tunro",  # "gpt-4"
     "model": "gpt-35-tunro",  # "gpt-4"
-    "max_tokens": 4000,
+    "max_tokens": 300,
     "temperature": 0.8,
     "n": 10,
     "stop": ['```'],
@@ -169,8 +169,9 @@ def run():
 
         sampled_files = list(sampled_querywise_files[query].keys())
         
-        pos_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 1 and x["file_tokens"] < 500)
-        neg_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 0 and x["file_tokens"] < 500)
+        # (4000 - 200 - 300)/2 ~ 750
+        pos_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 1 and x["file_tokens"] < 700)
+        neg_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 0 and x["file_tokens"] < 700)
         # if pos_exes.shape[0] > db_example_threshold:
         #     pos_exes = pos_exes.shuffle(seed=42).select(range(db_example_threshold))
         # if neg_exes.shape[0] > db_example_threshold:
