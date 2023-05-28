@@ -3,10 +3,11 @@ import torch
 import datasets
 from absl import flags
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-from utils import DEVICE, Relevance_Classification_Model
+from utils import Relevance_Classification_Model
 from utils import get_relevance_dataloader_input, get_relevance_dataloader, eval_fn_relevance_prediction
 
 FLAGS = flags.FLAGS
+DEVICE = "cuda:6"
 
 
 flags.DEFINE_string(
@@ -39,14 +40,14 @@ def get_relevance_model_performance(vocab_file):
         model_labels_ids
     )
 
-    eval_relevance_out, eval_relevance_targets = eval_fn_relevance_prediction(
+    eval_relevance_out, eval_relevance_targets, _ = eval_fn_relevance_prediction(
         eval_relevance_data_loader, model, DEVICE, False)
 
     assert len(eval_relevance_targets) == len(eval_relevance_out)
 
     scores = precision_recall_fscore_support(eval_relevance_targets, eval_relevance_out)
     relevance_accuracy = accuracy_score(eval_relevance_targets, eval_relevance_out)
-    # print(scores)
+    print(scores)
     print("Accuracy: ", relevance_accuracy, "Precision: ", scores[0][1], ", Recall: ", scores[1][1])
 
 

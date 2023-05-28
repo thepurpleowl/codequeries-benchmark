@@ -3,12 +3,13 @@ from absl import flags
 import torch
 import datasets
 import csv
-from utils import Cubert_Model, DEVICE, MAX_LEN
+from utils import Cubert_Model, MAX_LEN
 from utils import get_dataloader_input, get_twostep_dataloader_input, get_dataloader
 from utils import prepare_sliding_window_input, prepare_sliding_window_output
 from utils import eval_fn, all_metrics_scores
 
 FLAGS = flags.FLAGS
+DEVICE = "cuda:6"
 
 flags.DEFINE_string(
     "example_types_to_evaluate",
@@ -50,6 +51,12 @@ flags.DEFINE_integer(
     "sliding_window_width",
     1024,
     "Window size for `sliding_window` setting."
+)
+
+flags.DEFINE_string(
+    "span_type",
+    "both",
+    "both/answer/sf"
 )
 
 
@@ -115,7 +122,8 @@ if __name__ == "__main__":
                                                                output_sequences, FLAGS.sliding_window_width)
 
         metrics = all_metrics_scores(True, target_sequences,
-                                     pruned_target_sequences, output_sequences)
+                                     pruned_target_sequences, output_sequences,
+                                     FLAGS.span_type)
         RESULTS = ['CuBERT-1K', FLAGS.setting, FLAGS.example_types_to_evaluate, metrics["exact_match"]]
     else:
         from utils import Relevance_Classification_Model
@@ -131,7 +139,8 @@ if __name__ == "__main__":
          model_label_metadata_ids, model_target_metadata_ids) = get_twostep_dataloader_input(examples_data,
                                                                                              FLAGS.example_types_to_evaluate,
                                                                                              FLAGS.vocab_file,
-                                                                                             relevance_model)
+                                                                                             relevance_model,
+                                                                                             DEVICE)
 
         eval_data_loader, eval_file_length = get_dataloader(
             model_input_ids,
@@ -160,7 +169,8 @@ if __name__ == "__main__":
         assert len(model_predicted_labels_ids) == len(model_target_metadata_ids)
 
         metrics = all_metrics_scores(False, model_target_metadata_ids,
-                                     None, model_predicted_labels_ids)
+                                     None, model_predicted_labels_ids,
+                                     FLAGS.span_type)
 
         RESULTS = ['CuBERT-1K', FLAGS.setting, FLAGS.example_types_to_evaluate, metrics["exact_match"]]
 
