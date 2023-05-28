@@ -40,7 +40,8 @@ model_config = {
 }
 
 experiment_config = {
-    "Target_folder": "test_dir_file_bm25",
+    "Target_folder": "test_dir_file_random_each",
+    "template_path":"prompt_templates/span_highlight_V3.j2",
     "encoding":'UTF-8',
     "timeout": 8,
     "prompt_batch_size": 1,  # prompt_batch_size * max_tokens allowed in model < RateLimit (62*4000<250000)
@@ -66,7 +67,7 @@ model_handler = OpenAIModelHandler(
 )
 
 prompt_constructor = PromptConstructor(
-    template_path="prompt_templates/span_highlight_V3.j2",
+    template_path=experiment_config['template_path'],
     model=model_config["model"],
 )
 
@@ -126,7 +127,15 @@ def get_file_level_prompt_input_from_metadata(query, file_path, sampled_querywis
 def get_filename(fn):
     return '_'.join(fn.split('/'))
 
-def get_examples_for_prompt(pos_exes, neg_exes, bm25_db_pos, bm25_db_neg, input_code):
+def get_random_examples_for_prompt(pos_exes, neg_exes, query):
+    pos_ex = pos_exes.shuffle().select([0])
+    neg_ex = neg_exes.shuffle().select([0])
+    assert not neg_ex[0]['answer_spans']
+    assert not neg_ex[0]['supporting_fact_spans']
+
+    return pos_ex[0], neg_ex[0]
+
+def get_retrieved_examples_for_prompt(pos_exes, neg_exes, bm25_db_pos, bm25_db_neg, input_code):
     tokenized_input_code = input_code.split(" ")
 
     pos_ex_scores = bm25_db_pos.get_scores(tokenized_input_code)
@@ -147,15 +156,15 @@ def get_bm25_dbs(pos_exes, neg_exes):
 
     return bm25_db_pos, bm25_db_neg
 
-def run():
+def run(few_shot, random_selection):
     with open('resources/sampled_test_data.pkl', 'rb') as f: 
         sampled_querywise_files = pickle.load(f)
-    with open('resources/partitioned_data_train_1000.pkl', 'rb') as f: 
-        partitioned_data_train_1000 = pickle.load(f)
+    if few_shot:
+        with open('resources/partitioned_data_train_1000.pkl', 'rb') as f: 
+            partitioned_data_train_1000 = pickle.load(f)
 
     with open('resources/query_folderName_map.pkl', 'rb') as f:
         query_folderName_map = pickle.load(f)
-    db_example_threshold =1000
 
     Logger = Log()
     all_queries = list(sampled_querywise_files.keys())
@@ -169,23 +178,33 @@ def run():
 
         sampled_files = list(sampled_querywise_files[query].keys())
         
-        # (4000 - 200 - 300)/2 ~ 750
-        pos_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 1 and x["file_tokens"] < 700)
-        neg_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 0 and x["file_tokens"] < 700)
-        # if pos_exes.shape[0] > db_example_threshold:
-        #     pos_exes = pos_exes.shuffle(seed=42).select(range(db_example_threshold))
-        # if neg_exes.shape[0] > db_example_threshold:
-        #     neg_exes = neg_exes.shuffle(seed=42).select(range(db_example_threshold))
-        bm25_db_pos, bm25_db_neg = get_bm25_dbs(pos_exes, neg_exes)
+        if few_shot and not random_selection:
+            # (4000 - 200 - 300)/2 ~ 750
+            pos_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 1 and x["file_tokens"] < 700)
+            neg_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 0 and x["file_tokens"] < 700)
+            # if pos_exes.shape[0] > db_example_threshold:
+            #     pos_exes = pos_exes.shuffle(seed=42).select(range(db_example_threshold))
+            # if neg_exes.shape[0] > db_example_threshold:
+            #     neg_exes = neg_exes.shuffle(seed=42).select(range(db_example_threshold))
+            bm25_db_pos, bm25_db_neg = get_bm25_dbs(pos_exes, neg_exes)
+        elif few_shot and random_selection:
+        #     pos_ex, neg_ex = get_random_examples_for_prompt(partitioned_data_train_1000, query)
+            pos_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 1)
+            neg_exes = partitioned_data_train_1000[query].filter(lambda x: x["example_type"] == 0)
 
         processed_rows = []
         i = 0
         for file_path in tqdm(sampled_files):
             prompt_input = get_file_level_prompt_input_from_metadata(query, file_path, sampled_querywise_files)
-            pos_ex, neg_ex = get_examples_for_prompt(pos_exes, neg_exes, bm25_db_pos, bm25_db_neg, prompt_input['input_code'])
-            example_values = get_examples_values(query, pos_ex, neg_ex) 
-            for k in example_values:
-                prompt_input[k] = example_values[k]
+            if few_shot:
+                if not random_selection:
+                    pos_ex, neg_ex = get_retrieved_examples_for_prompt(pos_exes, neg_exes, bm25_db_pos, bm25_db_neg, prompt_input['input_code'])
+                elif random_selection:
+                    pos_ex, neg_ex = get_random_examples_for_prompt(pos_exes, neg_exes, query)
+
+                example_values = get_examples_values(query, pos_ex, neg_ex) 
+                for k in example_values:
+                    prompt_input[k] = example_values[k]
             prompt_str = prompt_constructor.construct(**prompt_input)
             if not prompt_str:
                 logger.info(file_path, prompt_str)
@@ -210,4 +229,4 @@ def run():
                         processed_rows)
         
 if __name__ == "__main__":
-    run()
+    run(few_shot=True, random_selection=True)

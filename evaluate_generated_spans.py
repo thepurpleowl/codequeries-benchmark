@@ -88,7 +88,7 @@ def multispan_eq(actual_spans, spans):
     
     return 1
 
-def pass_at_k(log_path, all_queries, query_folderName_map, k, n=10):
+def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10):
     pass_at_k = 0
     total = 0
     _cols_ = ['i', 'query', 'file_path', 'prompt', 'ans_spans']
@@ -101,6 +101,12 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, n=10):
         except (AssertionError, FileNotFoundError):
             # print(query)
             pass
+        if example_type == 'positive':
+            df = df[df['ans_spans'] != 'N/A']
+            assert df.shape[0] <= 10
+        elif example_type == 'negative':
+            df = df[df['ans_spans'] == 'N/A']
+            assert df.shape[0] <= 10
         total += df.shape[0]
 
         for _, row in df.iterrows():
@@ -119,19 +125,23 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, n=10):
             pass_at_k += cal_pass_at_k(n, pass_cnt, k)
     print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
 
-def eval(log_path):
+def eval(log_path, example_type):
     n = 10
     with open(__FILE_DIR__ / 'resources/query_folderName_map.pkl', 'rb') as f:
         query_folderName_map = pickle.load(f)
     all_queries = list(query_folderName_map.keys())
     # all_queries = ['Comparison of constants']
 
-    pass_at_k(log_path, all_queries, query_folderName_map, k=1)
-    pass_at_k(log_path, all_queries, query_folderName_map, k=2)
-    pass_at_k(log_path, all_queries, query_folderName_map, k=5)
-    pass_at_k(log_path, all_queries, query_folderName_map, k=10)
+    pass_at_k(log_path, all_queries, query_folderName_map, k=1, example_type=example_type)
+    pass_at_k(log_path, all_queries, query_folderName_map, k=2, example_type=example_type)
+    pass_at_k(log_path, all_queries, query_folderName_map, k=5, example_type=example_type)
+    pass_at_k(log_path, all_queries, query_folderName_map, k=10, example_type=example_type)
     # em_at_any(log_path, all_queries, query_folderName_map)
 
 
 if __name__ == "__main__":
-    eval('test_dir_file_v3/logs')
+    eval('test_dir_file_random_each/logs', 'both')
+    print('-'*50)
+    eval('test_dir_file_random_each/logs', 'positive')
+    print('-'*50)
+    eval('test_dir_file_random_each/logs', 'negative')
