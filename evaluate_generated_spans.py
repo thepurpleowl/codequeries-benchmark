@@ -4,47 +4,9 @@ from difflib import SequenceMatcher
 import pandas as pd
 from pathlib import Path
 import numpy as np
+import argparse
 __FILE_DIR__ = Path(__file__).parent
 
-def em_at_any(log_path, all_queries, query_folderName_map, n=10):
-    cnt_total = 0
-    total = 0
-    _cols_ = ['i', 'query', 'file_path', 'prompt', 'ans_spans']
-    _cols_.extend([f'ans_{i}' for i in range(n)])
-    for query in all_queries:
-        try:
-            df = pd.read_csv(__FILE_DIR__ / f'{log_path}/{query_folderName_map[query]}_logs.csv',
-                            names=_cols_, keep_default_na=False)
-            assert df.shape[0] == 20 and df.shape[1] == len(_cols_)
-        except (AssertionError, FileNotFoundError):
-            # print(query)
-            pass
-
-        total += df.shape[0]
-        cnt = 0
-        for _, row in df.iterrows():
-            actual_span = row['ans_spans']
-            gen_spans = [row[x] for x in [f'ans_{i}' for i in range(n)] if row[x].strip()]
-            found = False
-            for span in gen_spans:
-                if actual_span.strip() == span.strip():
-                    cnt += 1
-                    cnt_total += 1
-                    found = True
-                else:
-                    if actual_span:
-                        match = SequenceMatcher(None, actual_span, span).find_longest_match()
-                        if (match.size/len(actual_span) > 0.9 and match.size/len(span) > 0.9):
-                            cnt += 1
-                            cnt_total += 1
-                            found = True
-
-                if found == True:
-                    break
-            # if not found:
-            #     print(query, row['file_path'])
-                # print(actual_span, gen_spans)
-    print(f"Correct with any: {cnt_total}/{total} = {cnt_total/total}")
 
 def cal_pass_at_k(n, c, k):
     if n -c <k:
@@ -77,6 +39,7 @@ def multispan_eq(actual_spans, spans):
                     and singlespan_eq(actual_span, checked_generated_spans[si]['text']) == 1):
                 checked_generated_spans[si]['checked'] = True
                 this_span_eq = True
+                break
         # for some actual span if we dont find EM, then return 0
         if not this_span_eq:
             return 0
@@ -125,23 +88,90 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10
             pass_at_k += cal_pass_at_k(n, pass_cnt, k)
     print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
 
-def eval(log_path, example_type):
+def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
+    pass_at_k = 0
+    total = 0
+    _cols_ = ['i', 'query', 'file_path', 'prompt', 'ans_spans', 'sf_spans']
+    _cols_.extend([f'ans_{i}' for i in range(n)])
+    for query in all_queries:
+        try:
+            df = pd.read_csv(__FILE_DIR__ / f'{log_path}/{query_folderName_map[query]}_logs.csv',
+                            names=_cols_, keep_default_na=False)
+            assert df.shape[0] <= 10 and df.shape[1] == len(_cols_)
+        except (AssertionError, FileNotFoundError):
+            # print(query)
+            pass
+        total += df.shape[0]
+
+        for _, row in df.iterrows():
+            pass_cnt = 0
+            actual_ans_spans = row['ans_spans']
+            actual_sf_spans = row['sf_spans']
+            gen_spans = [row[x] for x in [f'ans_{i}' for i in range(n)] if row[x].strip()]
+
+            for _, spans in enumerate(gen_spans):
+                try:
+                    gen_ans_spans = spans.split('Supporting fact span(s)\n```python')[0].strip().strip('```').strip()
+                    gen_sf_spans = spans.split('Supporting fact span(s)\n```python')[1].strip()
+                except Exception as e:
+                    # print('Unexpected ', e)
+                    # print(query, row['file_path'], ii, len(gen_spans), spans)
+                    continue
+
+                ans_em = False
+                sf_em = False
+                # print(actual_ans_spans, '  ------------    ', actual_sf_spans)
+                # print(gen_ans_spans, '  ---|||||---    ', gen_sf_spans)
+                if len(actual_ans_spans.split(':::-:::')) == 1:
+                    ans_em = (singlespan_eq(actual_ans_spans, gen_ans_spans) == 1)
+                else:
+                    ans_em = (multispan_eq(actual_ans_spans, gen_ans_spans) == 1)
+
+                if len(actual_sf_spans.split(':::-:::')) == 1:
+                    sf_em = (singlespan_eq(actual_sf_spans, gen_sf_spans) == 1)
+                else:
+                    sf_em = (multispan_eq(actual_sf_spans, gen_sf_spans) == 1)
+            
+                if ans_em and sf_em:
+                    pass_cnt += 1
+            assert pass_cnt <= 10
+
+            # calculate pass@k
+            pass_at_k += cal_pass_at_k(n, pass_cnt, k)
+    print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
+
+def eval(log_path, example_type, with_sf=False):
     n = 10
     with open(__FILE_DIR__ / 'resources/query_folderName_map.pkl', 'rb') as f:
         query_folderName_map = pickle.load(f)
     all_queries = list(query_folderName_map.keys())
-    # all_queries = ['Comparison of constants']
-
-    pass_at_k(log_path, all_queries, query_folderName_map, k=1, example_type=example_type)
-    pass_at_k(log_path, all_queries, query_folderName_map, k=2, example_type=example_type)
-    pass_at_k(log_path, all_queries, query_folderName_map, k=5, example_type=example_type)
-    pass_at_k(log_path, all_queries, query_folderName_map, k=10, example_type=example_type)
-    # em_at_any(log_path, all_queries, query_folderName_map)
+    # all_queries = [
+    #                 # "'import *' may pollute namespace",
+    #                 # "An assert statement has a side-effect",
+    #                 "Comparison of constants",
+    #                 # "Comparison of identical values",
+    #                 # "Comparison using is when operands support `__eq__`",
+    #                 # "Conflicting attributes in base classes",
+    #                 # "Duplicate key in dict literal"
+    #                 ]
+    for k_i in [1, 2, 5, 10]:
+        if with_sf:
+            pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k=k_i)
+        else:
+            pass_at_k(log_path, all_queries, query_folderName_map, k=k_i, example_type=example_type)
 
 
 if __name__ == "__main__":
-    eval('test_dir_file_random_each/logs', 'both')
-    print('-'*50)
-    eval('test_dir_file_random_each/logs', 'positive')
-    print('-'*50)
-    eval('test_dir_file_random_each/logs', 'negative')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--generated_folder", "-g", type=str, required=True)
+    parser.add_argument("--with_sf", type=bool, default=False)
+
+    args = parser.parse_args()
+    if args.with_sf:
+        eval(args.generated_folder, 'positive', args.with_sf)
+    else:
+        eval(args.generated_folder, 'both')
+        print('-'*50)
+        eval(args.generated_folder, 'positive')
+        print('-'*50)
+        eval(args.generated_folder, 'negative')

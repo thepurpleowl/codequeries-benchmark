@@ -296,7 +296,7 @@ class OpenAIModelHandler:
                 for r in results
             ]
 
-class Log():
+class LogWriter():
     '''Class to log the results of the experiment in human readable format'''
     def __init__(self):
         pass
