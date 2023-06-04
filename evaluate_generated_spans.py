@@ -114,14 +114,11 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
                     gen_ans_spans = spans.split('Supporting fact span(s)\n```python')[0].strip().strip('```').strip()
                     gen_sf_spans = spans.split('Supporting fact span(s)\n```python')[1].strip()
                 except Exception as e:
-                    # print('Unexpected ', e)
-                    # print(query, row['file_path'], ii, len(gen_spans), spans)
+                    # consider as correct spans not being produced
                     continue
 
                 ans_em = False
                 sf_em = False
-                # print(actual_ans_spans, '  ------------    ', actual_sf_spans)
-                # print(gen_ans_spans, '  ---|||||---    ', gen_sf_spans)
                 if len(actual_ans_spans.split(':::-:::')) == 1:
                     ans_em = (singlespan_eq(actual_ans_spans, gen_ans_spans) == 1)
                 else:
@@ -145,15 +142,7 @@ def eval(log_path, example_type, with_sf=False):
     with open(__FILE_DIR__ / 'resources/query_folderName_map.pkl', 'rb') as f:
         query_folderName_map = pickle.load(f)
     all_queries = list(query_folderName_map.keys())
-    # all_queries = [
-    #                 # "'import *' may pollute namespace",
-    #                 # "An assert statement has a side-effect",
-    #                 "Comparison of constants",
-    #                 # "Comparison of identical values",
-    #                 # "Comparison using is when operands support `__eq__`",
-    #                 # "Conflicting attributes in base classes",
-    #                 # "Duplicate key in dict literal"
-    #                 ]
+
     for k_i in [1, 2, 5, 10]:
         if with_sf:
             pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k=k_i)

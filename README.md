@@ -16,11 +16,11 @@ More details on the curated dataset for this benchmark are available on [hugging
 
 
 ### LLM experiment
-python generate_spans.py --Target_folder="test_dir_file_bm25_sf" --prompt_template="prompt_templates/span_highlight_V3_sf.j2" --few_shot=True --with_sf=True --stop='```\nEND'
+python generate_spans.py --Target_folder="<test_dir_file_fewshot_sf>" --prompt_template="prompt_templates/span_highlight_fewshot_sf.j2" --few_shot=True --with_sf=True --stop='```\nEND'
 
-#### Evaluation
-python evaluate_generated_spans.py --g=test_dir_file_0shot/logs^C
-python evaluate_generated_spans.py --g=test_dir_file_bm25_sf/logs --with_sf=True
+#### LLM experiment Evaluation
+python evaluate_generated_spans.py --g=test_dir_file_0shot/logs
+python evaluate_generated_spans.py --g=test_dir_file_fewshot_sf/logs --with_sf=True
 
 ### Benchmark
 -----------
