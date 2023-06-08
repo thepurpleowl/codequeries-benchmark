@@ -125,5 +125,5 @@ def get_instances_for_files(sampled_data_path, dataset_setting, split):
 
 
 if __name__ == '__main__':
-    get_sampled_file_metadata('resources/partitioned_data_all.pkl', 'resources/sampled_test_data.pkl', 'test')
-    # get_sampled_file_metadata('resources/partitioned_data_train_all.pkl', 'resources/sampled_train_all_data.pkl')
+    # get_sampled_file_metadata('resources/partitioned_data_all.pkl', 'resources/sampled_test_data.pkl', 'test')
+    get_instances_for_files('resources/sampled_test_data.pkl', 'twostep', 'TEST')

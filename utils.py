@@ -523,6 +523,7 @@ def prepare_sliding_window_output(target_sequences, pruned_target_sequences, out
 
 def get_examples_for_twostep(examples_data, example_types_to_evaluate):
     twostep_dict = {}
+    twostep_meta_dict = {}
     for i, example_instance in enumerate(examples_data):
         if(not should_add_to_eval_set(example_instance,
                                       example_types_to_evaluate)):
@@ -534,11 +535,16 @@ def get_examples_for_twostep(examples_data, example_types_to_evaluate):
         else:
             twostep_dict[twostep_key].append(i)
 
-    return twostep_dict
+        if twostep_key not in twostep_meta_dict:
+            twostep_meta_dict[twostep_key] = example_instance['example_type']
+        else:
+            assert twostep_meta_dict[twostep_key] == example_instance['example_type']
+    return twostep_dict, twostep_meta_dict
 
 
 def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab_file, relevance_model, device):
-    twostep_dict = get_examples_for_twostep(examples_data, example_types_to_evaluate)
+    twostep_dict, twostep_meta_dict = get_examples_for_twostep(examples_data, example_types_to_evaluate)
+    twostep_example_order = []
 
     prepare_vocab_object = PREPAREVOCAB(vocab_file)
     sep_token = '[SEP]_'
@@ -550,6 +556,7 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
     model_label_metadata_ids = []
     model_target_labels_ids = []
     for twostep_key in tqdm(twostep_dict.keys(), desc="Preparing twostep data"):
+        twostep_example_order.append(twostep_key)
         # get relevant predicted examples
         first_sep_index = get_first_sep_label_index(examples_data[twostep_dict[twostep_key][0]]['label_sequence'])
         assert examples_data[twostep_dict[twostep_key][0]]['subtokenized_input_sequence'][first_sep_index] == sep_token
@@ -602,7 +609,7 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
                 for x in block_labels:
                     instance_predicted_labels_ids.append((x, block_index, block_offset))
                     block_offset += 1
-                
+
                 instance_input_tokens.append(sep_token)
                 instance_segment_ids.append(1)
                 instance_input_mask.append(1)
@@ -640,7 +647,8 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
         model_target_labels_ids.append(instance_target_labels_ids)
 
     return (model_input_ids, model_segment_ids, model_input_mask, model_labels_ids,
-            model_label_metadata_ids, model_target_labels_ids)
+            model_label_metadata_ids, model_target_labels_ids,
+            twostep_meta_dict, twostep_example_order)
 
 
 def get_relevance_dataloader_input(examples_data, vocab_file, disable_tqdm=True):

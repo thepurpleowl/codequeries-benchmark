@@ -1,14 +1,17 @@
 import torch
 import datasets
 import csv
+import pickle
+import os
+from pathlib import Path
 from tqdm import tqdm
+from transformers import AdamW, get_linear_schedule_with_warmup
 from utils import Cubert_Model, LR_SP, NUM_WARMUP_STEPS, BATCH, CSV_FIELDS, EPOCHS
 from utils import get_dataloader_input, get_dataloader
 from utils import eval_fn, train_fn, DEVICE
-from transformers import AdamW, get_linear_schedule_with_warmup
-import pickle
 
-
+if not Path('model_op').exists():
+    os.makedirs('model_op')
 RESULTS_CSV_PATH = 'model_op/sp_results.csv'
 MODEL_PATH = "model_op/model_sp_latest"
 

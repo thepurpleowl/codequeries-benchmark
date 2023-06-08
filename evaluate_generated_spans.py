@@ -3,6 +3,8 @@ import pandas as pd
 from pathlib import Path
 import numpy as np
 import argparse
+import os
+import csv
 # from difflib import SequenceMatcher
 __FILE_DIR__ = Path(__file__).parent
 
@@ -58,7 +60,9 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10
     total = 0
     _cols_ = ['i', 'query', 'file_path', 'prompt', 'ans_spans']
     _cols_.extend([f'ans_{i}' for i in range(n)])
+    querywise_em = {}
     for query in all_queries:
+        prev_pass_at_k = pass_at_k
         try:
             df = pd.read_csv(__FILE_DIR__ / f'{log_path}/{query_folderName_map[query]}_logs.csv',
                              names=_cols_, keep_default_na=False)
@@ -88,7 +92,10 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10
 
             # calculate pass@k
             pass_at_k += cal_pass_at_k(n, pass_cnt, k)
+        querywise_em[query] = (pass_at_k - prev_pass_at_k, df.shape[0])
     print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
+
+    return querywise_em
 
 
 def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
@@ -96,7 +103,9 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
     total = 0
     _cols_ = ['i', 'query', 'file_path', 'prompt', 'ans_spans', 'sf_spans']
     _cols_.extend([f'ans_{i}' for i in range(n)])
+    querywise_em = {}
     for query in all_queries:
+        prev_pass_at_k = pass_at_k
         try:
             df = pd.read_csv(__FILE_DIR__ / f'{log_path}/{query_folderName_map[query]}_logs.csv',
                              names=_cols_, keep_default_na=False)
@@ -138,7 +147,10 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
 
             # calculate pass@k
             pass_at_k += cal_pass_at_k(n, pass_cnt, k)
+        querywise_em[query] = (pass_at_k - prev_pass_at_k, df.shape[0])
     print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
+
+    return querywise_em
 
 
 def eval(log_path, example_type, with_sf=False):
@@ -146,26 +158,71 @@ def eval(log_path, example_type, with_sf=False):
         query_folderName_map = pickle.load(f)
     all_queries = list(query_folderName_map.keys())
 
+    querywise_results = []
     for k_i in [1, 2, 5, 10]:
         if with_sf:
-            pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k=k_i)
+            querywise_em = pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k=k_i)
+            querywise_results.append(querywise_em)
         else:
-            pass_at_k(log_path, all_queries, query_folderName_map, k=k_i, example_type=example_type)
+            querywise_em = pass_at_k(log_path, all_queries, query_folderName_map, k=k_i, example_type=example_type)
+            querywise_results.append(querywise_em)
+    return querywise_results
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--generated_folder", "-g", type=str, required=True)
     parser.add_argument("--with_sf", type=bool, default=False)
+    parser.add_argument("--querywise", type=bool, default=False)
 
     args = parser.parse_args()
     if args.with_sf:
         print('-' * 50, ' Positive ', '-' * 50)
-        eval(args.generated_folder, 'positive', args.with_sf)
+        pos_querywise_results = eval(args.generated_folder, 'positive', args.with_sf)
+
+        if args.querywise:
+            querywise_csv_path = f"analyses/{args.generated_folder.split('/')[0]}"
+            if not Path(querywise_csv_path).exists():
+                os.makedirs(querywise_csv_path)
+            rows = [['Query',
+                     'Pos_@1', 'Pos_@2', 'Pos_@5', 'Pos_@10']]
+            all_queries = list(pos_querywise_results[0].keys())
+            for query in all_queries:
+                row = [query]
+                for split_results in [pos_querywise_results]:
+                    for i, _ in enumerate([1, 2, 5, 10]):
+                        row.append(round(split_results[i][query][0] * 100 / split_results[i][query][1], 2))
+                rows.append(row)
+
+            with open(f'{querywise_csv_path}/querywise_LLM_results.csv', "w") as csvfile:
+                csvwriter = csv.writer(csvfile)
+                csvwriter.writerows(rows)
+            print(f'Querywise results are written to {querywise_csv_path}/querywise_LLM_results.csv')
     else:
         print('-' * 50, ' All ', '-' * 50)
-        eval(args.generated_folder, 'both')
+        all_querywise_results = eval(args.generated_folder, 'both')
         print('-' * 50, ' Positive ', '-' * 50)
-        eval(args.generated_folder, 'positive')
+        pos_querywise_results = eval(args.generated_folder, 'positive')
         print('-' * 50, ' Negative ', '-' * 50)
-        eval(args.generated_folder, 'negative')
+        neg_querywise_results = eval(args.generated_folder, 'negative')
+
+        if args.querywise:
+            querywise_csv_path = f"analyses/{args.generated_folder.split('/')[0]}"
+            if not Path(querywise_csv_path).exists():
+                os.makedirs(querywise_csv_path)
+            rows = [['Query',
+                     'All_@1', 'All_@2', 'All_@5', 'All_@10',
+                     'Pos_@1', 'Pos_@2', 'Pos_@5', 'Pos_@10',
+                     'Neg_@1', 'Neg_@2', 'Neg_@5', 'Neg_@10']]
+            all_queries = list(all_querywise_results[0].keys())
+            for query in all_queries:
+                row = [query]
+                for split_results in [all_querywise_results, pos_querywise_results, neg_querywise_results]:
+                    for i, _ in enumerate([1, 2, 5, 10]):
+                        row.append(round(split_results[i][query][0] * 100 / split_results[i][query][1], 2))
+                rows.append(row)
+
+            with open(f'{querywise_csv_path}/querywise_LLM_results.csv', "w") as csvfile:
+                csvwriter = csv.writer(csvfile)
+                csvwriter.writerows(rows)
+            print(f'Querywise results are written to {querywise_csv_path}/querywise_LLM_results.csv')
