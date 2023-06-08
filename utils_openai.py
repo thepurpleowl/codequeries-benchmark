@@ -27,10 +27,10 @@ class PromptConstructor:
         self,
         template_path: str,
         model: str,
-        max_length: int=4000,
-        context_block_seperator: str='',
+        max_length: int = 4000,
+        context_block_seperator: str = '',
     ):
-        
+
         with open(template_path, "r") as f:
             self.template = f.read()
         self.token_counter = lambda s: self.count_tokens(s, model_name=model)
@@ -63,10 +63,12 @@ class PromptConstructor:
 
         return prompt
 
+
 class OpenAIResponse(NamedTuple):
     text: str
     finish_reason: str
     success: bool
+
 
 class OpenAIModelHandler:
     def __init__(
@@ -97,7 +99,6 @@ class OpenAIModelHandler:
         self.openai_api_version = openai_api_version
 
     def get_response(self, input, instructions=None, **kwargs):
-        
         config = self.config
         if self.openai_api_type == "azure":
             config["engine"] = config["model"]
@@ -105,7 +106,6 @@ class OpenAIModelHandler:
         if "n" not in "config":
             config["n"] = 1
         n = config["n"]
-
 
         single_input = False
         if isinstance(input, str):
@@ -145,9 +145,9 @@ class OpenAIModelHandler:
         for i in range(0, num_examples, self.prompt_batch_size):
 
             if not edit_mode:
-                prompt_batch = input[i:i+self.prompt_batch_size]
+                prompt_batch = input[i:i + self.prompt_batch_size]
             else:
-                prompt_batch = list(zip(input[i:i+self.prompt_batch_size], instructions[i:i+self.prompt_batch_size]))
+                prompt_batch = list(zip(input[i:i + self.prompt_batch_size], instructions[i:i + self.prompt_batch_size]))
 
             logging.info(f"Current Batch - {i} to {i+self.prompt_batch_size} ...")
 
@@ -191,15 +191,14 @@ class OpenAIModelHandler:
                     if len(responses['choices']) != len(prompt_batch) * n:
                         logging.warning(f"Expected {len(prompt_batch) * n} responses, got {len(responses['choices'])} responses.")
                         raise RuntimeError("Expected number of responses not received.")
-                    
+
                     if self.retry_when_blank:
                         if any([r['text'].strip() == '' for r in responses['choices']]):
-                            
+
                             if attempt_count < self.max_attempts:
                                 attempt_count += 1
-                                logging.info(f"Blank response received, retrying ...")
+                                logging.info("Blank response received, retrying ...")
                                 continue
-                                
                             else:
                                 logging.info("Error - Blank response received.")
                                 for _ in range(self.prompt_batch_size):
@@ -215,10 +214,10 @@ class OpenAIModelHandler:
                         results.append(
                             [
                                 {'success': True, 'text': r['text'], 'finish_reason': r['finish_reason']}
-                                for r in responses['choices'][i:i+n]
+                                for r in responses['choices'][i:i + n]
                             ]
                         )
-                        
+
                     logging.info("Done")
                     break
 
@@ -270,19 +269,18 @@ class OpenAIModelHandler:
                     break
 
                 except Exception as e:
-                    print('here 4 ', e )
                     logging.warning(f"Error - {e}")
                     for _ in range(self.prompt_batch_size):
-                            results.append(
-                                [
-                                    {'success': False, 'text': None, 'finish_reason': "Error"}
-                                    for _ in range(n)
-                                ]
-                            )
+                        results.append(
+                            [
+                                {'success': False, 'text': None, 'finish_reason': "Error"}
+                                for _ in range(n)
+                            ]
+                        )
                     break
 
             time.sleep(self.timeout)
-        
+
         end_time = datetime.now()
         logging.info(
             f"Model request finished at time: {end_time:%Y-%m-%d %H:%M:%S}. Took {(end_time - start_time).total_seconds()} seconds."
@@ -296,12 +294,13 @@ class OpenAIModelHandler:
                 for r in results
             ]
 
+
 class LogWriter():
     '''Class to log the results of the experiment in human readable format'''
     def __init__(self):
         pass
 
     def create_logs(self, log_file_path, rows):
-        with open(log_file_path, "w") as csvfile: 
+        with open(log_file_path, "w") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerows(rows)

@@ -1,4 +1,3 @@
-#%%
 from pathlib import Path
 import pickle
 import json
@@ -23,11 +22,12 @@ def get_sanitized_content(ctxt_blocks):
     context_blocks = ""
     for ctxt_block in ctxt_blocks:
         newline_removed_content = ("\n".join(line 
-                                                for line in ctxt_block['content'].split('\n')
-                                                if line))
+                                             for line in ctxt_block['content'].split('\n')
+                                             if line))
         context_blocks += newline_removed_content
         context_blocks += '\n'
     return context_blocks
+
 
 def get_examples_values(query, pos_ex, neg_ex):
     y = {}
@@ -38,6 +38,7 @@ def get_examples_values(query, pos_ex, neg_ex):
 
     return y
 
+
 def get_sf_examples_values(ex, prompt_constructor, with_sf):
     y = {}
     y['positive_context'] = get_sanitized_content(ex['context_blocks'])
@@ -46,6 +47,7 @@ def get_sf_examples_values(ex, prompt_constructor, with_sf):
         y['supporting_fact_spans'] = [ans['span'] for ans in ex['supporting_fact_spans']]
 
     return prompt_constructor.construct(**y)
+
 
 def get_file_level_prompt_input(query, desc_dict, file_path, partitioned_data_all):
     df = partitioned_data_all[query].filter(lambda example: example["code_file_path"] == file_path and example['query_name'] == query)
@@ -66,10 +68,11 @@ def get_file_level_prompt_input(query, desc_dict, file_path, partitioned_data_al
         for row in df:
             assert row['example_type'] == 0
         y['answer_spans'] = 'N/A'
-    
+
     if not y['supporting_fact_spans']:
         y['supporting_fact_spans'] = 'N/A'
     return y
+
 
 def get_file_level_prompt_input_from_metadata(query, desc_dict, file_path, sampled_querywise_files):
     y = {}
@@ -81,13 +84,15 @@ def get_file_level_prompt_input_from_metadata(query, desc_dict, file_path, sampl
     y['supporting_fact_spans'] = ':::-:::'.join([sf['span'] for sf in sampled_querywise_files[query][file_path]['sf_spans']])
     if not y['answer_spans']:
         y['answer_spans'] = 'N/A'
-    
+
     if not y['supporting_fact_spans']:
         y['supporting_fact_spans'] = 'N/A'
     return y
 
+
 def get_filename(fn):
     return '_'.join(fn.split('/'))
+
 
 def extract_codeql_recommendation(meta_data):
     query_data: dict = json.load(open(meta_data, "r", encoding="utf-8"))
@@ -96,6 +101,7 @@ def extract_codeql_recommendation(meta_data):
 
     return query_data, reccos_dict, desc_dict
 
+
 def get_random_examples_for_prompt(pos_exes, neg_exes, query):
     pos_ex = pos_exes.shuffle().select([0])
     neg_ex = neg_exes.shuffle().select([0])
@@ -103,6 +109,7 @@ def get_random_examples_for_prompt(pos_exes, neg_exes, query):
     assert not neg_ex[0]['supporting_fact_spans']
 
     return pos_ex[0], neg_ex[0]
+
 
 def get_retrieved_examples_for_prompt(pos_exes, neg_exes, bm25_db_pos, bm25_db_neg, input_code):
     tokenized_input_code = input_code.split(" ")
@@ -115,6 +122,7 @@ def get_retrieved_examples_for_prompt(pos_exes, neg_exes, bm25_db_pos, bm25_db_n
     assert not neg_exes[selected_neg_index]['supporting_fact_spans']
 
     return pos_exes[selected_pos_index], neg_exes[selected_neg_index]
+
 
 def get_retrieved_sf_examples_for_prompt(pos_exes_with_sf, pos_exes_wo_sf, bm25_db_pos_with_sf, bm25_db_pos_wo_sf, 
                                          input_code, **sf_constructors):
@@ -150,11 +158,13 @@ def get_retrieved_sf_examples_for_prompt(pos_exes_with_sf, pos_exes_wo_sf, bm25_
                      'example_b': ex_b_text}
     return example_input
 
+
 def get_bm25_db(exes): 
     tokenized_corpus = [get_sanitized_content(cbs).split(" ") for cbs in exes['context_blocks']]
     bm25_db = BM25Okapi(tokenized_corpus)
 
     return bm25_db
+
 
 def run(few_shot, random_selection, with_sf,
         prompt_constructor, model_handler, experiment_config,
@@ -170,19 +180,18 @@ def run(few_shot, random_selection, with_sf,
         with open('resources/partitioned_data_train_1000.pkl', 'rb') as f: 
             partitioned_data_train_1000 = pickle.load(f)
 
-
     Logger = LogWriter()
     all_queries = list(sampled_querywise_files.keys())
     for query in tqdm(all_queries):
         logger.info(f'Current query: {query}')
         query_folderName = query_folderName_map[query]
-        if not Path(experiment_config["Target_folder"]+f"/logs").exists():
-            os.makedirs(experiment_config["Target_folder"]+f"/logs")
-        if not Path(experiment_config["Target_folder"]+f"/{query_folderName}").exists():
-            os.makedirs(experiment_config["Target_folder"]+f"/{query_folderName}")
+        if not Path(experiment_config["Target_folder"] + "/logs").exists():
+            os.makedirs(experiment_config["Target_folder"] + "/logs")
+        if not Path(experiment_config["Target_folder"] + f"/{query_folderName}").exists():
+            os.makedirs(experiment_config["Target_folder"] + f"/{query_folderName}")
 
         sampled_files = list(sampled_querywise_files[query].keys())
-        
+
         if few_shot and not random_selection:
             # (4000 - 200 - 300)/2 ~ 750
             if not with_sf:
@@ -223,9 +232,9 @@ def run(few_shot, random_selection, with_sf,
                         example_values = get_examples_values(query, pos_ex, neg_ex)
                     else:
                         example_values = get_retrieved_sf_examples_for_prompt(pos_exes_with_sf, pos_exes_wo_sf,
-                                                                          bm25_db_pos_with_sf, bm25_db_pos_wo_sf,
-                                                                          prompt_input['input_code'],
-                                                                          **sf_constructors)
+                                                                              bm25_db_pos_with_sf, bm25_db_pos_wo_sf,
+                                                                              prompt_input['input_code'],
+                                                                              **sf_constructors)
                 elif random_selection:
                     pos_ex, neg_ex = get_random_examples_for_prompt(pos_exes, neg_exes, query)
                     example_values = get_examples_values(query, pos_ex, neg_ex)
@@ -238,32 +247,30 @@ def run(few_shot, random_selection, with_sf,
                 logger.info(file_path, prompt_str)
                 continue
 
-            with open(Path(experiment_config["Target_folder"]+f"/{query_folderName}/{get_filename(file_path)}.log"), 'w') as f:
+            with open(Path(experiment_config["Target_folder"] + f"/{query_folderName}/{get_filename(file_path)}.log"), 'w') as f:
                 f.write(prompt_str)
 
             original_responses = model_handler.get_response(prompt_str)
             if with_sf:
-                p_row = [i, 
-                        query,
-                        file_path,
-                        '', #prompt_str,
-                        prompt_input['answer_spans'],
-                        prompt_input['supporting_fact_spans']]
+                p_row = [i,
+                         query,
+                         file_path,
+                         '',  # prompt_str,
+                         prompt_input['answer_spans'],
+                         prompt_input['supporting_fact_spans']]
             else:
-                p_row = [i, 
-                        query,
-                        file_path,
-                        '', #prompt_str,
-                        prompt_input['answer_spans']]
-            p_row.extend([
-                            original_responses[i].text.strip() if original_responses[i].text else '' for i in range(experiment_config['n'])
-                        ])
+                p_row = [i,
+                         query,
+                         file_path,
+                         '',  # prompt_str,
+                         prompt_input['answer_spans']]
+            p_row.extend([original_responses[i].text.strip() if original_responses[i].text else '' for i in range(experiment_config['n'])])
             processed_rows.append(p_row)
             i += 1
-            
-        Logger.create_logs(experiment_config["Target_folder"]+f"/logs/{query_folderName}_logs.csv",
-                        processed_rows)
-        
+
+        Logger.create_logs(experiment_config["Target_folder"] + f"/logs/{query_folderName}_logs.csv",
+                           processed_rows)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -272,13 +279,13 @@ if __name__ == "__main__":
     parser.add_argument("--api_base", type=str, default="https://gcrgpt4aoai6c.openai.azure.com/")
     parser.add_argument("--api_version", type=str, default="2023-03-15-preview")
 
-    parser.add_argument("--Target_folder", "-t", type=str, required=True)  #"test_dir_file_random_each"
-    parser.add_argument("--prompt_template", "-p", type=str, required=True)  #"prompt_templates/span_highlight_V3.j2"
+    parser.add_argument("--Target_folder", "-t", type=str, required=True)  # "test_dir_file_fewshot"
+    parser.add_argument("--prompt_template", "-p", type=str, required=True)  # "prompt_templates/span_highlight_fewshot.j2"
 
     parser.add_argument("--model", type=str, default='gpt-35-tunro')
     parser.add_argument("--max_tokens", type=int, default=300)
     parser.add_argument("--temperature", type=float, default=0.8)
-    parser.add_argument("--stop", type=str, default="```")
+    parser.add_argument("--stop", type=str, default="```")  # "```END" for 'with_sf=True' experiment
     parser.add_argument("--n", type=int, default=10)
 
     parser.add_argument("--few_shot", type=bool, default=False)
@@ -299,7 +306,7 @@ if __name__ == "__main__":
     experiment_config = {
         "Target_folder": args.Target_folder,
         "template_path": args.prompt_template,
-        "encoding":'UTF-8',
+        "encoding": 'UTF-8',
         "timeout": 8,
         "prompt_batch_size": 1,
         "timeout_mf": 2,
@@ -314,10 +321,10 @@ if __name__ == "__main__":
     model_handler = OpenAIModelHandler(
         model_config,
         Path(args.api_key_path).read_text().strip(),  # openai_api_key
-        timeout = experiment_config["timeout"],
-        prompt_batch_size = experiment_config["prompt_batch_size"],
+        timeout=experiment_config["timeout"],
+        prompt_batch_size=experiment_config["prompt_batch_size"],
         max_attempts=experiment_config["max_attempts"],
-        timeout_mf = experiment_config["timeout_mf"],
+        timeout_mf=experiment_config["timeout_mf"],
         openai_api_type=args.api_type,
         openai_api_base=args.api_base,
         openai_api_version=args.api_version,

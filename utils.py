@@ -198,8 +198,10 @@ def loss_fn(outputs, targets, batch, device):
         outputs.view(MAX_LEN * batch, NUMBER_OF_LABELS),
         targets.view(MAX_LEN * batch))
 
+
 def loss_fn_relevance_prediction(outputs, targets, device):
     return nn.CrossEntropyLoss(weight=RELEVANCE_WEIGHTS.to(device))(outputs, targets.squeeze(dim=1))
+
 
 def eval_fn(data_loader, model, device):
     model.eval()
@@ -540,7 +542,7 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
 
     prepare_vocab_object = PREPAREVOCAB(vocab_file)
     sep_token = '[SEP]_'
-    sep_token_id = prepare_vocab_object.convert_by_vocab([sep_token])[0]
+    # sep_token_id = prepare_vocab_object.convert_by_vocab([sep_token])[0]
     model_input_ids = []
     model_segment_ids = []
     model_input_mask = []

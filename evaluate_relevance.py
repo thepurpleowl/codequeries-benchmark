@@ -3,11 +3,10 @@ import torch
 import datasets
 from absl import flags
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-from utils import Relevance_Classification_Model
+from utils import Relevance_Classification_Model, DEVICE
 from utils import get_relevance_dataloader_input, get_relevance_dataloader, eval_fn_relevance_prediction
 
 FLAGS = flags.FLAGS
-DEVICE = "cuda:6"
 
 
 flags.DEFINE_string(

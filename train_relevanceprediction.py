@@ -3,14 +3,11 @@ import datasets
 import csv
 from tqdm import tqdm
 from utils import Relevance_Classification_Model, LR_RP, NUM_WARMUP_STEPS, RELEVANCE_BATCH, CSV_FIELDS, EPOCHS
-from utils import get_relevance_dataloader_input, get_relevance_dataloader
+from utils import get_relevance_dataloader_input, get_relevance_dataloader, DEVICE
 from utils import eval_fn_relevance_prediction, train_fn_relevance_prediction
 from transformers import AdamW, get_linear_schedule_with_warmup
 from sklearn.metrics import precision_recall_fscore_support
 import pickle
-
-
-DEVICE = "cuda:6"
 
 
 def train_relevance_subsample(train_data, dev_data):

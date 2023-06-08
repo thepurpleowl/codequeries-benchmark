@@ -1,17 +1,17 @@
-#%%
 import pickle
-from difflib import SequenceMatcher
 import pandas as pd
 from pathlib import Path
 import numpy as np
 import argparse
+# from difflib import SequenceMatcher
 __FILE_DIR__ = Path(__file__).parent
 
 
 def cal_pass_at_k(n, c, k):
-    if n -c <k:
+    if n - c < k:
         return 1
-    return 1 - np.prod(1.0 - k/np.arange(n-c+1, n+1))
+    return 1 - np.prod(1.0 - k / np.arange(n - c + 1, n + 1))
+
 
 def singlespan_eq(actual_span, span):
     if actual_span.strip() == span.strip():
@@ -24,8 +24,9 @@ def singlespan_eq(actual_span, span):
 
     return 0
 
+
 def multispan_eq(actual_spans, spans):
-    actual_spans = actual_spans.strip()   
+    actual_spans = actual_spans.strip()
     spans = spans.strip()
 
     checked_generated_spans = {}
@@ -43,13 +44,14 @@ def multispan_eq(actual_spans, spans):
         # for some actual span if we dont find EM, then return 0
         if not this_span_eq:
             return 0
-        
+
     # if for all actual spans we found EM, but extra spans present in generated span
     for si in checked_generated_spans:
         if not checked_generated_spans[si]['checked']:
             return 0
-    
+
     return 1
+
 
 def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10):
     pass_at_k = 0
@@ -59,7 +61,7 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10
     for query in all_queries:
         try:
             df = pd.read_csv(__FILE_DIR__ / f'{log_path}/{query_folderName_map[query]}_logs.csv',
-                            names=_cols_, keep_default_na=False)
+                             names=_cols_, keep_default_na=False)
             assert df.shape[0] == 20 and df.shape[1] == len(_cols_)
         except (AssertionError, FileNotFoundError):
             # print(query)
@@ -88,6 +90,7 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10
             pass_at_k += cal_pass_at_k(n, pass_cnt, k)
     print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
 
+
 def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
     pass_at_k = 0
     total = 0
@@ -96,7 +99,7 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
     for query in all_queries:
         try:
             df = pd.read_csv(__FILE_DIR__ / f'{log_path}/{query_folderName_map[query]}_logs.csv',
-                            names=_cols_, keep_default_na=False)
+                             names=_cols_, keep_default_na=False)
             assert df.shape[0] <= 10 and df.shape[1] == len(_cols_)
         except (AssertionError, FileNotFoundError):
             # print(query)
@@ -113,7 +116,7 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
                 try:
                     gen_ans_spans = spans.split('Supporting fact span(s)\n```python')[0].strip().strip('```').strip()
                     gen_sf_spans = spans.split('Supporting fact span(s)\n```python')[1].strip()
-                except Exception as e:
+                except IndexError:
                     # consider as correct spans not being produced
                     continue
 
@@ -128,7 +131,7 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
                     sf_em = (singlespan_eq(actual_sf_spans, gen_sf_spans) == 1)
                 else:
                     sf_em = (multispan_eq(actual_sf_spans, gen_sf_spans) == 1)
-            
+
                 if ans_em and sf_em:
                     pass_cnt += 1
             assert pass_cnt <= 10
@@ -137,8 +140,8 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
             pass_at_k += cal_pass_at_k(n, pass_cnt, k)
     print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
 
+
 def eval(log_path, example_type, with_sf=False):
-    n = 10
     with open(__FILE_DIR__ / 'resources/query_folderName_map.pkl', 'rb') as f:
         query_folderName_map = pickle.load(f)
     all_queries = list(query_folderName_map.keys())
@@ -157,10 +160,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.with_sf:
+        print('-' * 50, ' Positive ', '-' * 50)
         eval(args.generated_folder, 'positive', args.with_sf)
     else:
+        print('-' * 50, ' All ', '-' * 50)
         eval(args.generated_folder, 'both')
-        print('-'*50)
+        print('-' * 50, ' Positive ', '-' * 50)
         eval(args.generated_folder, 'positive')
-        print('-'*50)
+        print('-' * 50, ' Negative ', '-' * 50)
         eval(args.generated_folder, 'negative')

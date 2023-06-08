@@ -6,10 +6,10 @@ import csv
 from utils import Cubert_Model, MAX_LEN
 from utils import get_dataloader_input, get_twostep_dataloader_input, get_dataloader
 from utils import prepare_sliding_window_input, prepare_sliding_window_output
-from utils import eval_fn, all_metrics_scores
+from utils import eval_fn, all_metrics_scores, DEVICE
 
 FLAGS = flags.FLAGS
-DEVICE = "cuda:6"
+
 
 flags.DEFINE_string(
     "example_types_to_evaluate",
