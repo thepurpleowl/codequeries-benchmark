@@ -1,0 +1,1 @@
+For running test cases, place `my-languages.so` in `data_preparation/contexts` folder and `vocab.txt`(for CuBERT data) in `data_preparation` folder.

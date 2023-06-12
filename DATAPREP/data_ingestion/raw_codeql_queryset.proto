@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package codeqlqueries;
+
+message GitHubFilePath {
+  optional string repo = 1;
+  optional string unique_path = 2;
+}
+
+message QueryMetadata { 
+    optional string name = 1;
+    optional string description = 2;
+    optional string severity = 3;
+    optional string message = 4;
+    optional string full_metadata = 5;
+} 
+
+enum Hops {
+    undefined_hop = 0;
+    single_hop = 1;
+    multiple_hops = 2;
+}
+
+enum Languages {
+  Python = 0;
+  C = 1;
+  Cpp = 2;
+  Java = 3;
+}
+
+enum Span { 
+    undefined_span = 0;
+    single_span = 1;
+    multiple_spans = 2;
+} 
+
+message Query { 
+    optional GitHubFilePath query_path = 1;
+    optional bytes queryID = 2;
+    optional string content = 3;
+    optional QueryMetadata metadata = 4;
+    optional Languages language = 5; 
+    optional Hops hops = 6; 
+    optional Span span = 7;
+    optional bool distributable = 8;
+}
+
+message RawQueryList {  
+    repeated Query raw_query_set = 1;  
+}

@@ -1,0 +1,5 @@
+python run_create_perturbed_blocks_labels_dataset.py --serialized_query_path=/home/suryaprakash/data/queryset_serialized --tokenized_block_label_protobuf_file=/home/suryaprakash/data/block_labels/block_eval --save_dataset_location=/home/suryaprakash/data/perturbs/nlalt_block_labels/block_eval --perturbation_type=NL-ALT --query_name_alt_csv=/home/suryaprakash/data/alt_query.csv
+
+python run_create_block_subtokens_labels.py --model_type=cubert --ordering_of_blocks=line_number --vocab_file=/home/suryaprakash/data/vocab.txt --tokenized_block_label_protobuf_file=/home/suryaprakash/data/perturbs/nlalt_block_labels/block_eval --save_dataset_location=/home/suryaprakash/data/perturbs/lineorderd_block_subtoken/eval_block_subtoken
+
+python run_create_single_model_baseline_examples.py --model_type=cubert --block_subtoken_label_protobuf_file=/home/suryaprakash/data/perturbs/lineorderd_block_subtoken/eval_block_subtoken --vocab_file=/home/suryaprakash/data/vocab.txt --save_dataset_location=/home/suryaprakash/perturbs/nl_alt_singlemodel_cubert_eval_examples
