@@ -1,0 +1,262 @@
+[   
+    {
+        "name": "'import *' may pollute namespace",
+        "desc": "When you import a module using from xxx import * all public names defined in the module are imported and bound in the local namespace of the import statement. The public names are determined by checking the __all__ variable for the module. If __all__ is not defined then all names within the module that do not start with an underscore character are imported. This pollutes the current namespace with names that are not part of the public API for the module.",
+        "reccomendation": "There are two ways to address this problem:\n1. Where possible, modify the module being imported from and define __all__ to restrict the names to be imported\n2. Otherwise, explicitly import the values that you need."
+    },
+    {
+        "name": "An assert statement has a side-effect",
+        "desc": "All code defined in assert statements is ignored when optimization is requested, that is, the program is run with the -O flag. If an assert statement has any side-effects then the behavior of the program changes when optimization is requested.",
+        "reccomendation": "Move all expressions with side-effects out of assert statements."
+    },
+    {
+        "name": "Comparison of constants",
+        "desc":"When two constants are compared it is typically an indication of a mistake, since the Boolean value of the comparison will always be the same. In very old code this may be used to initialize True and False.", 
+        "reccomendation": "It is never good practice to compare a value with itself. If the constant behavior is indeed required, use the Boolean literals True or False, rather than encoding them obscurely as 1 == 1 or similar. If there is a mistake, ascertain the desired behavior and correct it."
+    },
+    {
+        "name": "Comparison of identical values",
+        "desc":"When two identical expressions are compared it is typically an indication of a mistake, since the Boolean value of the comparison will always be the same, unless the value is the floating point value float('nan').",
+        "reccomendation": "It is not good practice to compare a value with itself, as it makes the code hard to read and can hide errors with classes that do not correctly implement equality. If testing whether a floating-point value is not-a-number, then use math.isnan(). If the value may be a complex number, then use cmath.isnan() instead."
+    },
+    {
+        "name": "Comparison using is when operands support `__eq__`",
+        "desc":"When you compare two values using the is or is not operator, it is the object identities of the two values that is tested rather than their equality. If the class of either of the values in the comparison redefines equality then the is operator may return False even though the objects compare as equal. Equality is defined by the __eq__ or, in Python2, __cmp__ method. To compare two objects for equality, use the == or != operator instead.", 
+        "reccomendation": "When you want to compare the value of two literals, use the comparison operator == or != in place of is or is not. If the uniqueness property or performance are important then use an object that does not redefine equality."
+    },
+    {
+        "name": "Conflicting attributes in base classes",
+        "desc":"When a class subclasses multiple base classes, attribute lookup is performed from left to right amongst the base classes. This form of attribute lookup is called “method resolution order” and is a solution to the diamond inheritance problem where several base classes override a method in a shared superclass.\n\nUnfortunately, this means that if more than one base class defines the same attribute, the leftmost base class will effectively override the attribute of the rightmost base class, even though the leftmost base class is not a subclass of the rightmost base class. Unless the methods in question are designed for inheritance, using super, then this implicit overriding may not be the desired behavior. Even if it is the desired behavior it makes the code hard to understand and maintain.", 
+        "reccomendation": "There are a number of ways that might be used to address this issue:\nOverride the attribute in the subclass to implement the correct behavior.\nModify the class hierarchy and move equivalent or redundant methods to a common super class.\nModify the method hierarchy, breaking up complex methods into constituent parts.\nUse delegation rather than inheritance."
+    },
+    {
+        "name": "Constant in conditional expression or statement",
+        "desc":"Using a constant value as a test in a conditional statement renders the statement pointless as only one branch will be run regardless of any other factors.", 
+        "reccomendation": "If the conditional statement is required for debugging or similar then use a variable instead. Otherwise, remove the conditional statement and any associated dead code."
+    },
+    {
+        "name": "Deprecated slice method",
+        "desc":"The __getslice__, __setslice__ and __delslice__ methods have been deprecated since Python 2.0. In general, no class should implement these methods.\n\nThe only exceptions to this rule are classes that inherit from list and override __getitem__, __setitem__ or __delitem__. Since list implements the slicing methods any class inheriting from list must implement the the slicing methods to ensure correct behavior of __getitem__, __setitem__ and __delitem__. These exceptions to the rule will not be treated as violations.", 
+        "reccomendation": "Delete the slicing method. Any functionality should be moved to the equivalent __xxxitem__ method:\n__getslice__ should be replaced with __getitem__\n__setslice__ should be replaced with __setitem__\n__delslice__ should be replaced with __delitem__"
+    },
+    {
+        "name": "Duplicate key in dict literal",
+        "desc":"Dictionary literals are constructed in the order given in the source. This means that if a key is duplicated the second key-value pair will overwrite the first as a dictionary can only have one value per key.", 
+        "reccomendation": "Check for typos to ensure that the keys are supposed to be the same. If they are then decide which value is wanted and delete the other one."
+    },
+    {
+        "name": "Except block handles 'BaseException'",
+        "desc":"All exception classes in Python derive from BaseException. BaseException has three important subclasses, Exception from which all errors and normal exceptions derive, KeyboardInterrupt which is raised when the user interrupts the program from the keyboard and SystemExit which is raised by the sys.exit() function to terminate the program.\n\nSince KeyboardInterrupt and SystemExit are special they should not be grouped together with other Exception classes.\n\nCatching BaseException, rather than its subclasses may prevent proper handling of KeyboardInterrupt or SystemExit. It is easy to catch BaseException accidentally as it is caught implicitly by an empty except: statement.", 
+        "reccomendation": "Handle Exception, KeyboardInterrupt and SystemExit separately. Do not use the plain except: form."
+    },
+    {
+        "name": "First argument to super() is not enclosing class",
+        "desc":"The super class should be called with the enclosing class as its first argument and self as its second argument.\n\nPassing a different class may work correctly, provided the class passed is a super class of the enclosing class and the enclosing class does not define an __init__ method. However, this may result in incorrect object initialization if the enclosing class is later subclassed using multiple inheritance.",
+        "reccomendation": "Ensure that the first argument to super() is the enclosing class."
+    },
+    {
+        "name": "First parameter of a method is not named 'self'",
+        "desc":"Normal methods should have at least one parameter and the first parameter should be called self. This makes the purpose of the parameter clear to other developers.", 
+        "reccomendation": "If there is at least one parameter, then change the name of the first parameter to self as recommended by the style guidelines in PEP 8.\nIf there are no parameters, then it cannot be a normal method. It may need to be marked as a staticmethod or it could be moved out of the class as a normal function."
+    },
+    {
+        "name": "Flask app is run in debug mode",
+        "desc":"Running a Flask application with debug mode enabled may allow an attacker to gain access through the Werkzeug debugger.", 
+        "reccomendation": "Ensure that Flask applications that are run in a production environment have debugging disabled."
+    },
+    {
+        "name": "Illegal raise",
+        "desc":"If the object raised is not a legal Exception class or an instance of one, then a TypeError will be raised instead.\n\nLegal exception classes are:\n1) Any old-style classes (Python 2 only)\n2) Any subclass of the builtin class BaseException However, it recommended that you only use subclasses of the builtin class Exception (which is itself a subclass of BaseException).", 
+        "reccomendation": "Change the expression in the raise statement to be a legal exception."
+    },
+    {
+        "name": "Implicit string concatenation in a list",
+        "desc":"When two string literals abut each other the Python interpreter implicitly concatenates them into a single string. On occasion this can be useful, but is more commonly misleading or incorrect.", 
+        "reccomendation": "If the concatenation is deliberate, then use + to join the strings. This has no runtime overhead, and makes the intention clear."
+    },
+    {
+        "name": "Import of deprecated module",
+        "desc":"A module is deprecated when it cannot or will not be maintained indefinitely in the standard library. Deprecated modules may not receive security fixes or other important updates. See PEP 4 for a list of all deprecated modules.", 
+        "reccomendation": "Do not import the deprecated module. Replace uses of it with uses of a better maintained module."
+    },
+    {
+        "name": "Imprecise assert",
+        "desc":"The class unittest.TestCase provides a range of assertion methods. As well as the general forms assertTrue() and assertFalse() more specific forms such as assertGreaterEquals() and assertNotIn() are provided. By using the more specific forms it is possible to get more precise and informative failure messages in the event of a test failing. This can speed up the debugging process.", 
+        "reccomendation": "Replace all calls to assertTrue() and assertFalse() that do not provide a custom failure message with a more specific variant. Alternatively, provide a tailored failure message using the assertTrue(condition, message) form."
+    },
+    {
+        "name": "Incomplete URL substring sanitization",
+        "desc":"Sanitizing untrusted URLs is a common technique for preventing attacks such as request forgeries and malicious redirections. Usually, this is done by checking that the host of a URL is in a set of allowed hosts.\n\nHowever, treating the URL as a string and checking if one of the allowed hosts is a substring of the URL is very prone to errors. Malicious URLs can bypass such security checks by embedding one of the allowed hosts in an unexpected location.\n\nEven if the substring check is not used in a security-critical context, the incomplete check may still cause undesirable behaviors when the check succeeds accidentally.", 
+        "reccomendation": "Parse a URL before performing a check on its host value, and ensure that the check handles arbitrary subdomain sequences correctly."
+    },
+    {
+        "name": "Incomplete ordering",
+        "desc":"A class that implements an ordering operator (__lt__, __gt__, __le__ or __ge__) should implement all four in order that ordering between two objects is consistent and obeys the usual mathematical rules. If the ordering is inconsistent with default equality, then __eq__ and __ne__ should also be implemented.", 
+        "reccomendation": "Ensure that all four ordering comparisons are implemented as well as __eq__ and __ne__ if required.\nIt is not necessary to manually implement all four comparisons, the functools.total_ordering class decorator can be used."
+    },
+    {
+        "name": "Inconsistent equality and hashing",
+        "desc":"In order to conform to the object model, classes that define their own equality method should also define their own hash method, or be unhashable. If the hash method is not defined then the hash of the super class is used. This is unlikely to result in the expected behavior.\n\nA class can be made unhashable by setting its __hash__ attribute to None.\n\nIn Python 3, if you define a class-level equality method and omit a __hash__ method then the class is automatically marked as unhashable.", 
+        "reccomendation": "When you define an __eq__ method for a class, remember to implement a __hash__ method or set __hash__ = None."
+    },
+    {
+        "name": "Insecure temporary file",
+        "desc":"Functions that create temporary file names (such as tempfile.mktemp and os.tempnam) are fundamentally insecure, as they do not ensure exclusive access to a file with the temporary name they return. The file name returned by these functions is guaranteed to be unique on creation but the file must be opened in a separate operation. There is no guarantee that the creation and open operations will happen atomically. This provides an opportunity for an attacker to interfere with the file before it is opened.\n\nNote that mktemp has been deprecated since Python 2.3.", 
+        "reccomendation": "Replace the use of mktemp with some of the more secure functions in the tempfile module, such as TemporaryFile. If the file is intended to be accessed from other processes, consider using the NamedTemporaryFile function."
+    },
+    {
+        "name": "Missing call to `__init__` during object initialization",
+        "desc":"Python, unlike statically typed languages such as Java, allows complete freedom when calling methods during object initialization. However, standard object-oriented principles apply to Python classes using deep inheritance hierarchies. Therefore the developer has responsibility for ensuring that objects are properly initialized when there are multiple __init__ methods that need to be called.\n\nIf the __init__ method of a superclass is not called during object initialization it is likely that that object will end up in an incorrect state.\n\nA call to the __init__ method of a superclass during object initialization may be omitted:\n- When a subclass calls the __init__ method of the wrong class.\n- When a call to the __init__ method of one its base classes is omitted.\n- When multiple inheritance is used and a class inherits from several base classes, and at least one of those does not use super() in its own __init__ method.", 
+        "reccomendation": "Either be careful to explicitly call the __init__ of the correct base class, or use super() throughout the inheritance hierarchy.\nAlternatively refactor one or more of the classes to use composition rather than inheritance."
+    },
+    {
+        "name": "Modification of dictionary returned by locals()",
+        "desc":"The dictionary returned by locals() is not a view of the function's locals, but a copy. Therefore, modification of the dictionary returned from locals() will not modify the local variables of the function.", 
+        "reccomendation": "If the intention is to modify a local variable, then do so directly."
+    },
+    {
+        "name": "Modification of parameter with default",
+        "desc":"The default value of a parameter is computed once when the function is created, not for every invocation. The “pre-computed” value is then used for every subsequent call to the function. Consequently, if you modify the default value for a parameter this “modified” default value is used for the parameter in future calls to the function. This means that the function may not behave as expected in future calls and also makes the function more difficult to understand.", 
+        "reccomendation": "If a parameter has a default value, do not modify the default value. When you use a mutable object as a default value, you should use a placeholder value instead of modifying the default value. This is a particular problem when you work with lists and dictionaries but there are standard methods of avoiding modifying the default parameter (see References)."
+    },
+    {
+        "name": "Module is imported more than once",
+        "desc":"Importing the same module more than once has no effect as each module is only loaded once. It also confuses readers of the code.", 
+        "reccomendation": "Remove the second import."
+    },
+    {
+        "name": "Module is imported with 'import' and 'import from'",
+        "desc":"Importing a module twice using the import xxx and from xxx import yyy is confusing.", 
+        "reccomendation": "Remove the from xxx import yyy statement. Add yyy = xxx.yyy if required."
+    },
+    {
+        "name": "Nested loops with same variable",
+        "desc":"In Python variables have function-wide scope which means that if two variables have the same name in the same scope, they are in fact one variable. Consequently, nested loops in which the target variables have the same name in fact share a single variable. Such loops are difficult to understand as the inner loop will modify the target variable of the outer loop; this may be a typographical error.", 
+        "reccomendation": "Carefully examine the code and check for possible errors, particularly considering what would happen if the inner or outer variable were renamed."
+    },
+    {
+        "name": "Non-callable called",
+        "desc":"If an object is called, obj(), then that object must be a callable or a TypeError will be raised. A callable object is any object whose class defines the __call__ special method. Callable objects include functions, methods, classes.\n\nThe callable(object) builtin function determines if an object is callable or not.\n\nWhen the Python interpreter attempts to evaluate a call such as func(arg) it will invoke the __call__ special method on func. Thus, func(arg) is roughly equivalent to type(func).__call__(func, arg) which means that the class must define the attribute __call__, merely adding it to the instance is not sufficient.", 
+        "reccomendation": "The function called is non-callable"
+    },
+    {
+        "name": "Non-standard exception raised in special method",
+        "desc":"User-defined classes interact with the Python virtual machine via special methods (also called “magic methods”). For example, for a class to support addition it must implement the __add__ and __radd__ special methods. When the expression a + b is evaluated the Python virtual machine will call type(a).__add__(a, b) and if that is not implemented it will call type(b).__radd__(b, a).\n\nSince the virtual machine calls these special methods for common expressions, users of the class will expect these operations to raise standard exceptions. For example, users would expect that the expression a.b might raise an AttributeError if the object a does not have an attribute b. If a KeyError were raised instead, then this would be unexpected and may break code that expected an AttributeError, but not a KeyError.\n\nTherefore, if a method is unable to perform the expected operation then its response should conform to the standard protocol, described below.\n- Attribute access, a.b: Raise AttributeError\n- Arithmetic operations, a + b: Do not raise an exception, return NotImplemented instead.\n- Indexing, a[b]: Raise KeyError.\n- Hashing, hash(a): Use __hash__ = None to indicate that an object is unhashable.\n- Equality methods, a != b: Never raise an exception, always return True or False.\n- Ordering comparison methods, a < b: Raise a TypeError if the objects cannot be ordered.\n- Most others: Ideally, do not implement the method at all, otherwise raise TypeError to indicate that the operation is unsupported.", 
+        "reccomendation": "If the method is meant to be abstract, then declare it so using the @abstractmethod decorator. Otherwise, either remove the method or ensure that the method raises an exception of the correct type."
+    },
+    {
+        "name": "NotImplemented is not an Exception",
+        "desc":"NotImplemented is not an Exception, but is often mistakenly used in place of NotImplementedError. Executing raise NotImplemented or raise NotImplemented() will raise a TypeError. When raise NotImplemented is used to mark code that is genuinely never called, this mistake is benign. However, should it be called, then a TypeError will be raised rather than the expected NotImplemented, which might make debugging the issue difficult.\n\nThe correct use of NotImplemented is to implement binary operators. Code that is not intended to be called should raise NotImplementedError.",
+        "reccomendation": "Replace uses of NotImplemented with NotImplementedError."
+    },
+    {
+        "name": "Redundant assignment",
+        "desc":"Assigning a variable to itself is redundant and often an indication of a mistake in the code.", 
+        "reccomendation": "Check the assignment carefully for mistakes. If the assignment is truly redundant and not simply incorrect then remove it."
+    },
+    {
+        "name": "Redundant comparison",
+        "desc":"The result of certain comparisons can sometimes be inferred from their context and the results of other comparisons. This can be an indication of faulty logic and may result in dead code or infinite loops if, for example, a loop condition never changes its value.",
+        "reccomendation": "Inspect the code to check whether the logic is correct, and consider simplifying the logical expression."
+    },
+    {
+        "name": "Should use a 'with' statement",
+        "desc":"The with statement was introduced by PEP343 to allow standard uses of try-finally statements to be factored out. Using this simplification makes code easier to read.",
+        "reccomendation": "Review the code and determine whether or not the try-finally is used only to ensure that a resource is closed. If the only purpose is to ensure that a resource is closed, then replace the try-finally statement with a with statement."
+    },
+    {
+        "name": "Signature mismatch in overriding method",
+        "desc":"There are one (or more) legal parameters for an overridden method that are not legal for an overriding method. This will cause an error when the overriding method is called with a number of parameters that is legal for the overridden method. This violates the Liskov substitution principle.",
+        "reccomendation": "Ensure that the overriding method accepts all the parameters that are legal for overridden method."
+    },
+    {
+        "name": "Special method has incorrect signature",
+        "desc":"Special methods (sometimes also called magic methods) are how user defined classes interact with the Python virtual machine. For example, for a class to support addition it must implement the __add__ and __radd__ special methods. When the expression a + b is evaluated the Python virtual machine will call type(a).__add__(a, b) and if that is not implemented it will call type(b).__radd__(b, a).\n\nSince these special methods are always called by the virtual machine with a fixed number of parameters, if the method is implemented with a different number of parameters it will fail at runtime with a TypeError.",
+        "reccomendation": "Carefully examine the code and check for possible errors, particularly considering what would happen if the inner or outer variable were renamed."
+    },
+    {
+        "name": "Suspicious unused loop iteration variable",
+        "desc":"A for loop iteration variable is not used in the body of the loop, and the loop does not count the number of items in the sequence. This is suspicious as there is rarely any reason to iterate over a sequence and not use the contents. Not using the loop variable can often indicate a logical error or typo.",
+        "reccomendation": "Carefully check that the loop variable should not be used. If the variable is genuinely not being used and the code is correct, then rename the variable to _ or unused to indicate to readers of the code that it is intentionally unused."
+    },
+    {
+        "name": "Testing equality to None",
+        "desc":"When you compare an object to None, use is rather than ==. None is a singleton object, comparing using == invokes the __eq__ method on the object in question, which may be slower than identity comparison. Comparing to None using the is operator is also easier for other programmers to read.",
+        "reccomendation": "Replace == with is."
+    },
+    {
+        "name": "Unguarded next in generator",
+        "desc":"The function next() will raise a StopIteration exception if the underlying iterator is exhausted. Normally this is fine, but in a generator may cause problems. Since the StopIteration is an exception it will be propagated out of the generator causing termination of the generator. This is unlikely to be the expected behavior and may mask errors.\n\nThis problem is considered sufficiently serious that PEP 479 has been accepted to modify the handling of StopIteration in generators. Consequently, code that does not handle StopIteration properly is likely to fail in future versions of Python.",
+        "reccomendation": "Each call to next() should be wrapped in a try-except to explicitly handle StopIteration exceptions."
+    },
+    {
+        "name": "Unnecessary 'else' clause in loop",
+        "desc":"The else clause of a loop (either a for or a while statement) executes immediately after the loop terminates normally. If there is a break statement in the loop body, then the else clause is skipped. If there is no break statement, then the else clause will always be executed after the loop, unless it exits with a return or raise. Therefore, if there is no break statement in the loop body then the else clause can be replaced with unindented code.\n\nGenerally the use of else clauses should be avoided where possible, as they are likely to be misunderstood.",
+        "reccomendation": "Replace the else clause with unindented code."
+    },
+    {
+        "name": "Unnecessary delete statement in function",
+        "desc":"Passing a local variable to a del statement results in that variable being removed from the local namespace. When exiting a function all local variables are deleted, so it is unnecessary to explicitly delete variables in such cases.",
+        "reccomendation": "Remove the del statement."
+    },
+    {
+        "name": "Unnecessary pass",
+        "desc":"A pass statement is only necessary when it is the only statement in a block (the list of statements forming part of a compound statement). This is because the purpose of the pass statement is to allow empty blocks where they would otherwise be syntactically invalid. If the block already contains other statements then the pass statement is unnecessary.",
+        "reccomendation": "Remove the pass statement."
+    },
+    {
+        "name": "Unreachable code",
+        "desc":"Unreachable code makes the code more difficult to understand and may slow down loading of modules.",
+        "reccomendation": "Deleting the unreachable code will make the code clearer and preserve the meaning of the code. However, it is possible that the original intention was that the code should execute and that it is unreachable signifies some other error."
+    },
+    {
+        "name": "Unused import",
+        "desc":"A module is imported (using the import statement) but that module is never used. This creates a dependency that does not need to exist and makes the code more difficult to read.",
+        "reccomendation": "Delete the import statement."
+    },
+    {
+        "name": "Unused local variable",
+        "desc":"A local variable is defined (by an assignment) but never used.\n\nIt is sometimes necessary to have a variable which is not used. These unused variables should have distinctive names, to make it clear to readers of the code that they are deliberately not used. The most common conventions for indicating this are to name the variable _ or to start the name of the variable with unused or _unused.\n\nThe query accepts the following names for variables that are intended to be unused:\n- Any name consisting entirely of underscores.\n- Any name containing unused.\n- The names dummy or empty.\n- Any “special” name of the form __xxx__. Variables that are defined in a group, for example x, y = func() are handled collectively. If they are all unused, then this is reported. Otherwise they are all treated as used.",
+        "reccomendation": "If the variable is included for documentation purposes or is otherwise intentionally unused, then change its name to indicate that it is unused, otherwise delete the assignment (taking care not to delete right hand side if it has side effects)."
+    },
+    {
+        "name": "Use of 'global' at module level",
+        "desc":"The global statement is used to specify that assignments to that name are assignments to the variable in the global (module) scope, rather than in the local scope. At the module level, this statement is redundant because the local scope and global scope are the same.",
+        "reccomendation": "Remove the global statement."
+    },
+    {
+        "name": "Use of the return value of a procedure",
+        "desc":"All functions in Python return a value. If a function has no return statements or none of the return statements return a value then the function will return None. However, this value has no meaning and should be ignored.\n\nUsing the return value of such a 'procedure' is confusing to the reader as it suggests that the value is significant.",
+        "reccomendation": "Do not use the return value of a procedure; replace x = proc() with proc() and replace any use of the value with None."
+    },
+    {
+        "name": "Variable defined multiple times",
+        "desc":"Multiple assignments to a single variable without an intervening usage makes the first assignment redundant. Its value is lost.",
+        "reccomendation": "Ensure that the second assignment is in fact correct. Then delete the first assignment (taking care not to delete right hand side if it has side effects)."
+    },
+    {
+        "name": "Wrong number of arguments in a call",
+        "desc":"A function call must supply an argument for each parameter that does not have a default value defined, so:\n- The minimum number of arguments is the number of parameters without default values.\n- The maximum number of arguments is the total number of parameters, unless the function takes a varargs (starred) parameter in which case there is no limit.",
+        "reccomendation": "If there are too few arguments then check to see which arguments have been omitted and supply values for those.\n\nIf there are too many arguments then check to see if any have been added by mistake and remove those.\n\nAlso check where a comma has been inserted instead of an operator or a dot. For example, the code is obj,attr when it should be obj.attr.\n\nIf it is not clear which are the missing or surplus arguments, then this suggests a logical error. The fix will then depend on the nature of the error."
+    },
+    {
+        "name": "Wrong number of arguments in a class instantiation",
+        "desc":"A call to the __init__ method of a class must supply an argument for each parameter that does not have a default value defined, so:\n- The minimum number of arguments is the number of parameters without default values.\n- The maximum number of arguments is the total number of parameters, unless the class __init__ method takes a varargs (starred) parameter in which case there is no limit.",
+        "reccomendation": "If there are too few arguments then check to see which arguments have been omitted and supply values for those.\n\nIf there are too many arguments then check to see if any have been added by mistake and remove those.\n\nAlso check where a comma has been inserted instead of an operator or a dot. For example, the code is obj,attr when it should be obj.attr.\n\nIf it is not clear which are the missing or surplus arguments, then this suggests a logical error. The fix will then depend on the nature of the error."
+    },
+    {
+        "name": "`__eq__` not overridden when adding attributes",
+        "desc":"A class that defines attributes that are not present in its superclasses may need to override the __eq__() method (__ne__() should also be defined).\n\nAdding additional attributes without overriding __eq__() means that the additional attributes will not be accounted for in equality tests.",
+        "reccomendation": "Override the __eq__ method."
+    },
+    {
+        "name": "`__init__` method calls overridden method",
+        "desc":"When an instance of a class is initialized, the super-class state should be fully initialized before it becomes visible to the subclass. Calling methods of the subclass in the superclass' __init__ method violates this important invariant.",
+        "reccomendation": "Do not use methods that are subclassed in the construction of an object. For simpler cases move the initialization into the superclass' __init__ method, preventing it being overridden. Additional initialization of subclass should be done in the __init__ method of the subclass. For more complex cases, it is advisable to use a static method or function to manage object creation.\n\nAlternatively, avoid inheritance altogether using composition instead."
+    },
+    {
+        "name": "`__iter__` method returns a non-iterator",
+        "desc":"The __iter__ method of a class should always return an iterator.\n\nIterators must implement both __next__ and __iter__ for Python 3, or both next and __iter__ for Python 2. The __iter__ method of the iterator must return the iterator object itself.\n\nIteration in Python relies on this behavior and attempting to iterate over an instance of a class with an incorrect __iter__ method can raise a TypeError.",
+        "reccomendation": "Make sure the value returned by __iter__ implements the full iterator protocol."
+    }
+]

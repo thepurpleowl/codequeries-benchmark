@@ -1,0 +1,3 @@
+[submodule "CodeQueries_preparation/data_preparation/cubert"]
+	path = CodeQueries_preparation/data_preparation/cubert
+	url = https://github.com/thepurpleowl/cubert.git

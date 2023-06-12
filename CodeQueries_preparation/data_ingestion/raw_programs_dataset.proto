@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package rawprogramsdataset;
+
+message GitHubFilePath {
+  // Repository name from where the raw program files are taken
+  optional string repo = 1;
+  // blob
+  optional string unique_path = 2;
+}
+
+// Determining path when programs are taken from any arbitrary
+// dataset
+enum datasetsplit {
+  UNDEFINED = 0;
+  TRAIN = 1;
+  TEST = 2;
+  VALIDATION = 3;
+}
+
+message DatasetFilePath {
+  optional string source_name = 1;
+  optional datasetsplit split = 2;
+  // Relative to the topmost level of the files.
+  optional string unique_file_path = 3;
+}
+
+// Unique identification of program filepath irrespective of source
+message FilePath {
+  oneof filepathunion {
+    GitHubFilePath github_file_path = 1;
+    DatasetFilePath dataset_file_path = 2;
+  }
+}
+
+enum Languages {
+  Python = 0;
+  C = 1;
+  Cpp = 2;
+  Java = 3;
+}
+
+message RawProgramFile {
+  optional FilePath file_path = 1;
+  optional Languages language = 2;
+  optional string file_content = 3;
+}
+
+message RawProgramDataset { repeated RawProgramFile raw_program_dataset = 1; }

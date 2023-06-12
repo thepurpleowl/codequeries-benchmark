@@ -3,12 +3,16 @@ from absl import flags
 import torch
 import datasets
 import csv
-from utils import Cubert_Model, DEVICE, MAX_LEN
+import pickle
+import os
+from pathlib import Path
+from utils import Cubert_Model, MAX_LEN
 from utils import get_dataloader_input, get_twostep_dataloader_input, get_dataloader
 from utils import prepare_sliding_window_input, prepare_sliding_window_output
-from utils import eval_fn, all_metrics_scores
+from utils import eval_fn, all_metrics_scores, DEVICE
 
 FLAGS = flags.FLAGS
+
 
 flags.DEFINE_string(
     "example_types_to_evaluate",
@@ -52,6 +56,24 @@ flags.DEFINE_integer(
     "Window size for `sliding_window` setting."
 )
 
+flags.DEFINE_string(
+    "span_type",
+    "both",
+    "both/answer/sf"
+)
+
+flags.DEFINE_string(
+    "data",
+    "sampled",
+    "all/sampled"
+)
+
+
+def get_name(example_types_to_evaluate,
+             relevance_model_checkpoint_path,
+             span_model_checkpoint_path):
+    return example_types_to_evaluate + '_' + relevance_model_checkpoint_path[:5] + '_' + span_model_checkpoint_path[:5]
+
 
 if __name__ == "__main__":
     argv = FLAGS(sys.argv)
@@ -62,8 +84,12 @@ if __name__ == "__main__":
         examples_data = datasets.load_dataset("thepurpleowl/codequeries", "prefix",
                                               split=datasets.Split.TEST, use_auth_token=True)
     else:
-        examples_data = datasets.load_dataset("thepurpleowl/codequeries", FLAGS.setting,
-                                              split=datasets.Split.TEST, use_auth_token=True)
+        if FLAGS.data == all:
+            examples_data = datasets.load_dataset("thepurpleowl/codequeries", FLAGS.setting,
+                                                  split=datasets.Split.TEST, use_auth_token=True)
+        else:
+            with open('resources/twostep_TEST.pkl', 'rb') as f:
+                examples_data = pickle.load(f)
 
     if(FLAGS.setting != "twostep"):
         if(FLAGS.setting == "sliding_window"):
@@ -115,7 +141,8 @@ if __name__ == "__main__":
                                                                output_sequences, FLAGS.sliding_window_width)
 
         metrics = all_metrics_scores(True, target_sequences,
-                                     pruned_target_sequences, output_sequences)
+                                     pruned_target_sequences, output_sequences,
+                                     FLAGS.span_type)
         RESULTS = ['CuBERT-1K', FLAGS.setting, FLAGS.example_types_to_evaluate, metrics["exact_match"]]
     else:
         from utils import Relevance_Classification_Model
@@ -128,10 +155,23 @@ if __name__ == "__main__":
         span_model.load_state_dict(torch.load(FLAGS.span_model_checkpoint_path, map_location=DEVICE))
 
         (model_input_ids, model_segment_ids, model_input_mask, model_labels_ids,
-         model_label_metadata_ids, model_target_metadata_ids) = get_twostep_dataloader_input(examples_data,
-                                                                                             FLAGS.example_types_to_evaluate,
-                                                                                             FLAGS.vocab_file,
-                                                                                             relevance_model)
+         model_label_metadata_ids, model_target_metadata_ids,
+         twostep_meta_dict, twostep_example_order) = get_twostep_dataloader_input(examples_data,
+                                                                                  FLAGS.example_types_to_evaluate,
+                                                                                  FLAGS.vocab_file,
+                                                                                  relevance_model,
+                                                                                  DEVICE)
+
+        store_path = "analyses"
+        if not Path(store_path).exists():
+            os.makedirs(store_path)
+        save_name = get_name(FLAGS.example_types_to_evaluate,
+                             FLAGS.relevance_model_checkpoint_path,
+                             FLAGS.span_model_checkpoint_path)
+        with open(f'{store_path}/twostep_{FLAGS.data}_{save_name}_meta_dict.pkl', 'wb') as f:
+            pickle.dump(twostep_meta_dict, f)
+        with open(f'{store_path}/twostep_{FLAGS.data}_{save_name}_example_order.pkl', 'wb') as f:
+            pickle.dump(twostep_example_order, f)
 
         eval_data_loader, eval_file_length = get_dataloader(
             model_input_ids,
@@ -159,14 +199,20 @@ if __name__ == "__main__":
         # no of examples
         assert len(model_predicted_labels_ids) == len(model_target_metadata_ids)
 
+        with open(f'{store_path}/model_{FLAGS.data}_{save_name}_target_metadata_ids.pkl', 'wb') as f:
+            pickle.dump(model_target_metadata_ids, f)
+        with open(f'{store_path}/model_{FLAGS.data}_{save_name}_predicted_labels_ids.pkl', 'wb') as f:
+            pickle.dump(model_predicted_labels_ids, f)
+
         metrics = all_metrics_scores(False, model_target_metadata_ids,
-                                     None, model_predicted_labels_ids)
+                                     None, model_predicted_labels_ids,
+                                     FLAGS.span_type)
 
         RESULTS = ['CuBERT-1K', FLAGS.setting, FLAGS.example_types_to_evaluate, metrics["exact_match"]]
 
     assert len(HEADER) == len(RESULTS)
 
-    with open(FLAGS.results_store_path, "a") as f:
+    with open(f'{store_path}/twostep_{FLAGS.data}_{save_name}_{FLAGS.results_store_path}', "a") as f:
         csvwriter = csv.writer(f)
         csvwriter.writerow(HEADER)
 

@@ -1,0 +1,20 @@
+Example code snippet with answer span(s) matching the query description with supporting fact span(s)
+```python
+{{ positive_context }}
+```
+
+
+Answer span(s)
+```python
+{% for span in positive_spans %}
+{{span}}
+{% endfor %}
+```
+
+
+Supporting fact span(s)
+```python
+{% for span in supporting_fact_spans %}
+{{span}}
+{% endfor %}
+```END

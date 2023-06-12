@@ -3,23 +3,25 @@ import torch.nn as nn
 from tqdm import tqdm
 import numpy as np
 import math
-from transformers import BertConfig
-from transformers import BertModel
+from transformers import BertConfig, BertModel
+from transformers import set_seed
 from collections import namedtuple
-
+set_seed(42)
 
 NUMBER_OF_LABELS = 5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MAX_LEN = 1024
 MAX_LEN_RELEVANCE = 512
 SECOND_LAYER_HIDDEN_SIZE = 2048
+TRAIN_BATCH_SIZE = 4
 BATCH = 4
 RELEVANCE_BATCH = 16
 DROPOUT = 0.1
-LEARNING_RATE = 3e-5
-EPOCHS = 3
+LR_SP = 3e-5
+LR_RP = 2e-6
+EPOCHS = 10
 NUM_WARMUP_STEPS = 0
-
+RELEVANCE_WEIGHTS = torch.FloatTensor([1, 2])
 CSV_FIELDS = ["Epoch", "Train_Loss", "Validation_Loss"]
 USE_WEIGHTS_IN_LOSS_FUNCTION = False
 RESULTS_FILE_PATH = "training_results_.csv"
@@ -147,10 +149,14 @@ class JSONRelevanceDataset:
 
 # model
 class Cubert_Model(nn.Module):
-    def __init__(self, config_path='./pretrained_model_configs/config_1024.json'):
+    def __init__(self, mode='eval', config_path='./pretrained_model_configs/config_1024.json'):
         super().__init__()
-        config = BertConfig.from_pretrained(config_path)
-        self.bert = BertModel(config)
+        if mode == 'eval':
+            config = BertConfig.from_pretrained(config_path)
+            self.bert = BertModel(config)
+        elif mode == 'train':
+            print("Loading pre-trained weights")
+            self.bert = BertModel.from_pretrained("./pre-trained-model-1024")
         self.bert_drop = nn.Dropout(DROPOUT)
         self.out = nn.Linear(MAX_LEN, NUMBER_OF_LABELS)
 
@@ -163,10 +169,14 @@ class Cubert_Model(nn.Module):
 
 
 class Relevance_Classification_Model(nn.Module):
-    def __init__(self, config_path='./pretrained_model_configs/config_512.json'):
+    def __init__(self, mode='eval', config_path='./pretrained_model_configs/config_512.json'):
         super().__init__()
-        config = BertConfig.from_pretrained(config_path)
-        self.bert = BertModel(config)
+        if mode == 'eval':
+            config = BertConfig.from_pretrained(config_path)
+            self.bert = BertModel(config)
+        elif mode == 'train':
+            print("Loading pre-trained weights")
+            self.bert = BertModel.from_pretrained("./pre-trained-model-512")
         self.bert_drop = nn.Dropout(DROPOUT)
         self.out1 = nn.Linear(1024, SECOND_LAYER_HIDDEN_SIZE)
         self.out = nn.Linear(SECOND_LAYER_HIDDEN_SIZE, 2)
@@ -189,13 +199,17 @@ def loss_fn(outputs, targets, batch, device):
         targets.view(MAX_LEN * batch))
 
 
+def loss_fn_relevance_prediction(outputs, targets, device):
+    return nn.CrossEntropyLoss(weight=RELEVANCE_WEIGHTS.to(device))(outputs, targets.squeeze(dim=1))
+
+
 def eval_fn(data_loader, model, device):
     model.eval()
     accessing_target_sequence_for_first_time = 1
     accessing_output_sequence_for_first_time = 1
     total_loss = 0
     with torch.no_grad():
-        for d in tqdm(data_loader, total=len(data_loader)):
+        for d in tqdm(data_loader, total=len(data_loader), disable=True):
             ids = d["ids"]
             token_type_ids = d["token_type_ids"]
             mask = d["mask"]
@@ -232,14 +246,16 @@ def eval_fn(data_loader, model, device):
                                                    out.cpu().detach().numpy()), axis=0)
 
             b = out.view(out.shape[0] * out.shape[1])
+    total_loss = total_loss / len(data_loader)
 
     return target_sequences, output_sequences, total_loss
 
 
-def eval_fn_relevance_prediction(data_loader, model, device, disable_tqdm=True):
+def eval_fn_relevance_prediction(data_loader, model, device, disable_tqdm=False):
     model.eval()
     fin_targets = []
     fin_outputs = []
+    total_loss = 0
     with torch.no_grad():
         for d in tqdm(data_loader, total=len(data_loader), desc="Relevance evaluation", disable=disable_tqdm):
             ids = d["ids"]
@@ -253,6 +269,9 @@ def eval_fn_relevance_prediction(data_loader, model, device, disable_tqdm=True):
             targets = targets.to(device)
 
             outputs = model(ids=ids, mask=mask, token_type_ids=token_type_ids)
+
+            loss = loss_fn_relevance_prediction(outputs, targets, device)
+            total_loss = total_loss + loss
 
             a = targets.data
             b = outputs.data                        # shape[batch, labels]
@@ -269,7 +288,8 @@ def eval_fn_relevance_prediction(data_loader, model, device, disable_tqdm=True):
             fin_outputs.extend(temp_b)
             fin_targets.extend(temp_a)
 
-    return fin_outputs, fin_targets
+    total_loss = total_loss / len(data_loader)
+    return fin_outputs, fin_targets, total_loss
 
 
 # training
@@ -291,6 +311,29 @@ def train_fn(data_loader, model, optimizer, device, scheduler):
         outputs = model(ids=ids, mask=mask, token_type_ids=token_type_ids)
 
         loss = loss_fn(outputs, targets, outputs.shape[0], device)
+        loss.backward()
+        optimizer.step()
+        scheduler.step()
+
+
+def train_fn_relevance_prediction(data_loader, model, optimizer, device, scheduler):
+    model.train()
+
+    for d in tqdm(data_loader, total=len(data_loader)):
+        ids = d["ids"]
+        token_type_ids = d["token_type_ids"]
+        mask = d["mask"]
+        targets = d["targets"]
+
+        ids = ids.to(device)
+        token_type_ids = token_type_ids.to(device)
+        mask = mask.to(device)
+        targets = targets.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(ids=ids, mask=mask, token_type_ids=token_type_ids)
+
+        loss = loss_fn_relevance_prediction(outputs, targets, device)
         loss.backward()
         optimizer.step()
         scheduler.step()
@@ -324,7 +367,7 @@ def get_dataloader_input(examples_data, example_types_to_evaluate, setting, voca
     model_segment_ids = []
     model_input_mask = []
     model_labels_ids = []
-    for example_instance in tqdm(examples_data, desc="Preparing input"):
+    for example_instance in tqdm(examples_data, desc="Preparing input", disable=True):
         assert (len(example_instance['subtokenized_input_sequence'])
                 == len(example_instance['label_sequence']))
         if(not should_add_to_eval_set(example_instance,
@@ -374,9 +417,9 @@ def prepare_sliding_window_input(model_input_ids, model_segment_ids, model_input
     example_id = 0
     for i in tqdm(range(len(model_input_ids)), desc="Prepare sliding window examples"):
         assert (len(model_input_ids[i])
-        == len(model_segment_ids[i])
-        == len(model_input_mask[i])
-        == len(model_labels_ids[i]))
+                == len(model_segment_ids[i])
+                == len(model_input_mask[i])
+                == len(model_labels_ids[i]))
 
         example_len = len(model_input_ids[i])
         if example_len < sliding_window_width:
@@ -480,6 +523,7 @@ def prepare_sliding_window_output(target_sequences, pruned_target_sequences, out
 
 def get_examples_for_twostep(examples_data, example_types_to_evaluate):
     twostep_dict = {}
+    twostep_meta_dict = {}
     for i, example_instance in enumerate(examples_data):
         if(not should_add_to_eval_set(example_instance,
                                       example_types_to_evaluate)):
@@ -491,15 +535,20 @@ def get_examples_for_twostep(examples_data, example_types_to_evaluate):
         else:
             twostep_dict[twostep_key].append(i)
 
-    return twostep_dict
+        if twostep_key not in twostep_meta_dict:
+            twostep_meta_dict[twostep_key] = example_instance['example_type']
+        else:
+            assert twostep_meta_dict[twostep_key] == example_instance['example_type']
+    return twostep_dict, twostep_meta_dict
 
 
-def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab_file, relevance_model):
-    twostep_dict = get_examples_for_twostep(examples_data, example_types_to_evaluate)
+def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab_file, relevance_model, device):
+    twostep_dict, twostep_meta_dict = get_examples_for_twostep(examples_data, example_types_to_evaluate)
+    twostep_example_order = []
 
     prepare_vocab_object = PREPAREVOCAB(vocab_file)
     sep_token = '[SEP]_'
-    sep_token_id = prepare_vocab_object.convert_by_vocab([sep_token])[0]
+    # sep_token_id = prepare_vocab_object.convert_by_vocab([sep_token])[0]
     model_input_ids = []
     model_segment_ids = []
     model_input_mask = []
@@ -507,15 +556,16 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
     model_label_metadata_ids = []
     model_target_labels_ids = []
     for twostep_key in tqdm(twostep_dict.keys(), desc="Preparing twostep data"):
+        twostep_example_order.append(twostep_key)
         # get relevant predicted examples
         first_sep_index = get_first_sep_label_index(examples_data[twostep_dict[twostep_key][0]]['label_sequence'])
         assert examples_data[twostep_dict[twostep_key][0]]['subtokenized_input_sequence'][first_sep_index] == sep_token
         # initiate span prediction examples
-        instance_input_tokens = examples_data[twostep_dict[twostep_key][0]]['subtokenized_input_sequence'][:first_sep_index+1]
-        instance_segment_ids = [0 for _ in range(first_sep_index+1)]
-        instance_input_mask = [1 for _ in range(first_sep_index+1)]
+        instance_input_tokens = examples_data[twostep_dict[twostep_key][0]]['subtokenized_input_sequence'][:first_sep_index + 1]
+        instance_segment_ids = [0 for _ in range(first_sep_index + 1)]
+        instance_input_mask = [1 for _ in range(first_sep_index + 1)]
         instance_target_labels_ids = [(x, -1, -1)
-                                      for x in examples_data[twostep_dict[twostep_key][0]]['label_sequence'][:first_sep_index+1]]
+                                      for x in examples_data[twostep_dict[twostep_key][0]]['label_sequence'][:first_sep_index + 1]]
         instance_predicted_labels_ids = instance_target_labels_ids.copy()
         # get relevance prediction of blocks
         if len(twostep_dict[twostep_key]) == 1:
@@ -529,14 +579,14 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
                 assert get_first_sep_label_index(examples_data[ti]['label_sequence']) == first_sep_index
 
             (rel_i_input_ids, rel_i_segment_ids,
-            rel_i_input_mask, rel_i_labels_ids) = get_relevance_dataloader_input(twostep_key_relevance_data, vocab_file)
+             rel_i_input_mask, rel_i_labels_ids) = get_relevance_dataloader_input(twostep_key_relevance_data, vocab_file)
             rel_i_data_loader, _ = get_relevance_dataloader(
                 rel_i_input_ids,
                 rel_i_input_mask,
                 rel_i_segment_ids,
                 rel_i_labels_ids
             )
-            rel_i_out, rel_i_targets = eval_fn_relevance_prediction(rel_i_data_loader, relevance_model, DEVICE)
+            rel_i_out, rel_i_targets, _ = eval_fn_relevance_prediction(rel_i_data_loader, relevance_model, device)
 
         assert len(rel_i_out) == len(twostep_dict[twostep_key]) == len(rel_i_targets)
         # form span prediction examples
@@ -544,8 +594,8 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
         target_extra_sep_added = False
         for k, predicted in enumerate(rel_i_out):
             assert get_first_sep_label_index(examples_data[twostep_dict[twostep_key][k]]['label_sequence']) == first_sep_index
-            block_tokens = examples_data[twostep_dict[twostep_key][k]]['subtokenized_input_sequence'][first_sep_index+1:]
-            block_labels = examples_data[twostep_dict[twostep_key][k]]['label_sequence'][first_sep_index+1:]
+            block_tokens = examples_data[twostep_dict[twostep_key][k]]['subtokenized_input_sequence'][first_sep_index + 1:]
+            block_labels = examples_data[twostep_dict[twostep_key][k]]['label_sequence'][first_sep_index + 1:]
             assert len(block_tokens) == len(block_labels)
 
             block_index = examples_data[twostep_dict[twostep_key][k]]['context_block']['index']
@@ -559,7 +609,7 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
                 for x in block_labels:
                     instance_predicted_labels_ids.append((x, block_index, block_offset))
                     block_offset += 1
-                
+
                 instance_input_tokens.append(sep_token)
                 instance_segment_ids.append(1)
                 instance_input_mask.append(1)
@@ -568,7 +618,7 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
 
             if rel_i_targets[k] == 1:
                 block_offset = 0
-                for x in examples_data[twostep_dict[twostep_key][k]]['label_sequence'][first_sep_index+1:]:
+                for x in examples_data[twostep_dict[twostep_key][k]]['label_sequence'][first_sep_index + 1:]:
                     instance_target_labels_ids.append((x, block_index, block_offset))
                     block_offset += 1
 
@@ -597,7 +647,8 @@ def get_twostep_dataloader_input(examples_data, example_types_to_evaluate, vocab
         model_target_labels_ids.append(instance_target_labels_ids)
 
     return (model_input_ids, model_segment_ids, model_input_mask, model_labels_ids,
-            model_label_metadata_ids, model_target_labels_ids)
+            model_label_metadata_ids, model_target_labels_ids,
+            twostep_meta_dict, twostep_example_order)
 
 
 def get_relevance_dataloader_input(examples_data, vocab_file, disable_tqdm=True):
@@ -683,7 +734,7 @@ def get_relevance_dataloader(input_ids_lists, input_mask_lists, segment_ids_list
 
 
 # evaluation metrics
-def find_tag_aware_spans(labels_sequence, blocks_ids_sequence=None):
+def find_tag_aware_spans(labels_sequence, blocks_ids_sequence=None, span_type='both'):
     """
     Finds and returns spans with 'B'/'F' beginning within a sequence. A
     span starts with a "B"/"F" label, followed by contiguous "I" labels.
@@ -729,10 +780,24 @@ def find_tag_aware_spans(labels_sequence, blocks_ids_sequence=None):
         else:
             i += 1
 
-    return spans
+    filtered_span = set()
+    if span_type == 'answer':
+        for span in spans:
+            if span[0].tag == 0:
+                filtered_span.add(span)
+        return filtered_span
+    elif span_type == 'sf':
+        for span in spans:
+            if span[0].tag == 3:
+                filtered_span.add(span)
+        return filtered_span
+    elif span_type == 'both':
+        return spans
+    else:
+        raise ValueError("Unknown span type")
 
 
-def find_twostep_tag_aware_spans(labels_sequence):
+def find_twostep_tag_aware_spans(labels_sequence, span_type='both'):
     """
     Finds and returns spans with 'B'/'F' beginning within a sequence. A
     span starts with a "B"/"F" label, followed by contiguous "I" labels.
@@ -771,7 +836,21 @@ def find_twostep_tag_aware_spans(labels_sequence):
         else:
             i += 1
 
-    return spans
+    filtered_span = set()
+    if span_type == 'answer':
+        for span in spans:
+            if span[0].tag == 0:
+                filtered_span.add(span)
+        return filtered_span
+    elif span_type == 'sf':
+        for span in spans:
+            if span[0].tag == 3:
+                filtered_span.add(span)
+        return filtered_span
+    elif span_type == 'both':
+        return spans
+    else:
+        raise ValueError("Unknown span type")
 
 
 class InstanceLevelMetrics:
@@ -780,7 +859,8 @@ class InstanceLevelMetrics:
     """
 
     def __init__(self, for_single_model,
-                 pruned_target_labels, target_labels, output_labels):
+                 pruned_target_labels, target_labels, output_labels,
+                 span_type):
         """
         Args:
             for_single_model: True if evaluating single baseline model, else False.
@@ -796,14 +876,15 @@ class InstanceLevelMetrics:
         self.pruned_target_labels = pruned_target_labels
         self.target_labels = target_labels
         self.output_labels = output_labels
+        self.span_type = span_type
 
     def twostep_non_weighted_exact_match_complete_target(self):
         exact_match = 0
         examples = len(self.target_labels)
 
         for i in range(examples):
-            target_spans = find_twostep_tag_aware_spans(self.target_labels[i])
-            predicted_spans = find_twostep_tag_aware_spans(self.output_labels[i])
+            target_spans = find_twostep_tag_aware_spans(self.target_labels[i], span_type=self.span_type)
+            predicted_spans = find_twostep_tag_aware_spans(self.output_labels[i], span_type=self.span_type)
 
             if(target_spans == predicted_spans):
                 exact_match += 1
@@ -815,8 +896,8 @@ class InstanceLevelMetrics:
         examples = len(self.target_labels)
 
         for i in range(examples):
-            target_spans = find_tag_aware_spans(self.target_labels[i])
-            predicted_spans = find_tag_aware_spans(self.output_labels[i])
+            target_spans = find_tag_aware_spans(self.target_labels[i], span_type=self.span_type)
+            predicted_spans = find_tag_aware_spans(self.output_labels[i], span_type=self.span_type)
 
             if(target_spans == predicted_spans):
                 exact_match += 1
@@ -840,7 +921,7 @@ class InstanceLevelMetrics:
         return metrics
 
 
-def all_metrics_scores(for_single_model, target_labels, pruned_target_labels, output_labels):
+def all_metrics_scores(for_single_model, target_labels, pruned_target_labels, output_labels, span_type):
     """
     This function returns all metric scores for span prediction.
     Args:
@@ -853,7 +934,35 @@ def all_metrics_scores(for_single_model, target_labels, pruned_target_labels, ou
     """
     instance_level_metrics_obj = InstanceLevelMetrics(for_single_model,
                                                       pruned_target_labels, target_labels,
-                                                      output_labels)
+                                                      output_labels, span_type)
     instance_level_metrics = instance_level_metrics_obj.return_all_metrics()
 
     return instance_level_metrics
+
+
+def get_EM(examples_data, model):
+    """
+    To check exact match on single example. 
+    """
+    assert len(examples_data) == 1
+    (model_input_ids, model_segment_ids,
+        model_input_mask, model_labels_ids) = get_dataloader_input(examples_data,
+                                                                   example_types_to_evaluate="all",
+                                                                   setting='ideal',
+                                                                   vocab_file="pretrained_model_configs/vocab.txt")
+    target_sequences = model_labels_ids
+    eval_data_loader, eval_file_length = get_dataloader(
+        model_input_ids,
+        model_input_mask,
+        model_segment_ids,
+        model_labels_ids
+    )
+    pruned_target_sequences, output_sequences, _ = eval_fn(
+        eval_data_loader, model, DEVICE)
+
+    pruned_target_sequences = pruned_target_sequences.tolist()
+    output_sequences = output_sequences.tolist()
+
+    metrics = all_metrics_scores(True, target_sequences,
+                                 pruned_target_sequences, output_sequences)
+    return metrics['exact_match']

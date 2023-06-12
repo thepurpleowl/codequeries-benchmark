@@ -1,0 +1,288 @@
+syntax = "proto3";
+
+package dataset_with_context;
+
+message GitHubFilePath {
+  optional string repo = 1;
+  optional string unique_path = 2;
+}
+
+message QueryMetadata {
+  optional string name = 1;
+  optional string description = 2;
+  optional string severity = 3;
+  optional string message = 4;
+  optional string full_metadata = 5;
+}
+
+enum Hops {
+  undefined_hop = 0;
+  single_hop = 1;
+  multiple_hops = 2;
+}
+
+enum Languages {
+  Python = 0;
+  C = 1;
+  Cpp = 2;
+  Java = 3;
+}
+
+enum Span {
+  undefined_span = 0;
+  single_span = 1;
+  multiple_spans = 2;
+}
+
+message Query {
+  optional GitHubFilePath query_path = 1;
+  optional bytes queryID = 2;
+  optional string content = 3;
+  optional QueryMetadata metadata = 4;
+  optional Languages language = 5;
+  optional Hops hops = 6;
+  optional Span span = 7;
+  optional bool distributable = 8;
+}
+
+message RawQueryList { repeated Query raw_query_set = 1; }
+
+enum datasetsplit {
+  UNDEFINED = 0;
+  TRAIN = 1;
+  TEST = 2;
+  VALIDATION = 3;
+}
+
+message DatasetFilePath {
+  optional string source_name = 1;
+  optional datasetsplit split = 2;
+  optional string unique_file_path = 3;
+}
+
+message FilePath {
+  oneof filepathunion {
+    GitHubFilePath github_file_path = 1;
+    DatasetFilePath dataset_file_path = 2;
+  }
+}
+
+message RawProgramFile {
+  optional FilePath file_path = 1;
+  optional Languages language = 2;
+  optional string file_content = 3;
+}
+
+message RawProgramDataset { repeated RawProgramFile raw_program_dataset = 1; }
+
+message SupportingFactLocation {
+  optional int32 start_line = 1;
+  optional int32 end_line = 2;
+  optional int32 start_column = 3;
+  optional int32 end_column = 4;
+}
+
+message ResultLocation {
+  optional int32 start_line = 1;
+  optional int32 end_line = 2;
+  optional int32 start_column = 3;
+  optional int32 end_column = 4;
+  optional string message = 5;
+  repeated SupportingFactLocation supporting_fact_locations = 6;
+}
+
+message RawQueryResult {
+  optional RawProgramFile raw_file = 1;
+  optional ResultLocation result_location = 2;
+  optional Query query = 3;
+}
+
+message RawResultDataset {
+  repeated RawQueryResult query_and_files_results = 1;
+}
+
+message RawMergedQueryResult {
+  optional RawProgramFile raw_file_path = 1;
+  repeated ResultLocation resultlocation = 2;
+  optional Query query = 3;
+}
+
+message RawMergedResultDataset {
+  repeated RawMergedQueryResult query_and_files_results = 1;
+}
+
+enum OutputLabels {
+  B = 0;
+  I = 1;
+  O = 2;
+  F = 3;
+  _ = 4;
+}
+
+message TokensLabelsAndMetaData {
+  optional int32 start_line = 1;
+  optional int32 end_line = 2;
+  optional int32 start_column = 3;
+  optional int32 end_column = 4;
+  optional string program_token = 5;
+  optional OutputLabels label = 6;
+}
+
+message TokenizedProgramQueryLabels {
+  optional RawMergedQueryResult query_and_files_results = 1;
+  repeated string query_name_tokens = 2;
+  repeated TokensLabelsAndMetaData tokens_metadata_labels = 3;
+}
+
+enum ExampleType {
+  negative = 0;
+  positive = 1;
+}
+
+message TokenizedQueryProgramLabelsDataset {
+  repeated TokenizedProgramQueryLabels tokens_and_labels = 1;
+  optional ExampleType example_type = 2;
+}
+
+enum ProgramBlockTypes {
+  CLASS_FUNCTION = 0;
+  CLASS_OTHER = 1;
+  MODULE_FUNCTION = 2;
+  MODULE_OTHER = 3;
+  STUB = 4;
+}
+
+enum BlockRelevance {
+  no = 0;
+  yes = 1;
+}
+
+message ProgramBlockDetails {
+  optional ProgramBlockTypes block_type = 1;
+  optional BlockRelevance relevance_label = 2;
+  optional int32 start_line = 3;
+  optional int32 end_line = 4;
+  repeated int32 other_lines = 5; 
+  optional bytes unique_block_id = 6;
+  optional string content = 7;
+  optional string metadata = 8;
+  optional FilePath file_path = 9;
+}
+
+/*A block with corresponding token labels*/
+message TokenizedBlockQueryLabels {
+  optional bytes query_id = 1;
+  optional bool distributable = 2;
+  optional RawProgramFile raw_file = 3;
+  optional ProgramBlockDetails block = 4;
+  repeated TokensLabelsAndMetaData block_metadata_tokens_labels = 5;
+  repeated string query_name_tokens = 6;
+}
+
+/*A collection of blocks and corresponding token labels. This is for a specific
+query, the corresponding answer containing block, and other related context 
+blocks. These blocks either represent blocks with context or blocks with answers*/
+message TokenizedBlockQueryLabelsGroup {
+  repeated TokenizedBlockQueryLabels tokenized_block_query_labels_group_item = 1;
+}
+
+message TokenizedBlockQueryLabelsDataset {
+  repeated TokenizedBlockQueryLabelsGroup tokenized_block_query_labels_item = 1;
+  repeated ExampleType example_types = 2;
+}
+
+message SubtokenLabel {
+  optional string program_subtoken = 1;
+  optional OutputLabels label = 2; 
+}
+
+message DataFlowEdgetoNode{
+  repeated int32 edge_list = 1;
+}
+
+message DataFlowEdges{
+  repeated DataFlowEdgetoNode dfg_to_dfg = 1;
+  repeated int32 dfg_to_subtoken_start = 2;
+  repeated int32 dfg_to_subtoken_end = 3;
+}
+
+
+message BlockQuerySubtokensLabels {
+  optional bytes query_id = 1;
+  optional bool distributable = 2;
+  optional RawProgramFile raw_file = 3;
+  optional ProgramBlockDetails block = 4;
+  repeated SubtokenLabel block_subtokens_labels = 5;
+  repeated string query_name_subtokens = 6;
+  optional DataFlowEdges df_edges = 7;
+}
+
+/*A collection of blocks and corresponding subtokens and labels. This is for a specific
+query, the corresponding answer containing block, and other related context 
+blocks. These blocks either represent blocks with context or blocks with answers*/
+message BlockQuerySubtokensLabelsGroup {
+  repeated BlockQuerySubtokensLabels block_query_subtokens_labels_group_item = 1;
+}
+
+message BlockQuerySubtokensLabelsDataset {
+  repeated BlockQuerySubtokensLabelsGroup block_query_subtokens_labels_item = 1;
+  repeated ExampleType example_types = 2;
+}
+
+message SingleGroupItem {
+  optional bytes query_id = 1;
+  optional bytes block_id = 2;
+  repeated int32 input_ids = 4; 
+  repeated int32 input_mask = 5; 
+  repeated int32 segment_ids = 6;
+  repeated int32 label_ids = 7;
+  optional BlockRelevance relevance = 8;
+  repeated int32 program_ids = 9;
+  repeated int32 program_label_ids = 10;
+}
+
+message SingleGroupExample {
+  repeated int32 query_name_token_ids = 1;
+  optional bool distributable = 2;
+  repeated SingleGroupItem group_items = 3;
+  optional ExampleType example_type = 4;
+}
+
+message ExampleForGroupwisePredictionDataset {
+  repeated SingleGroupExample examples = 1;
+}
+
+message ExampleforRelevancePrediction {
+  optional bytes query_id = 1;
+  optional string program_path = 2;
+  optional bytes block_id = 3;
+  repeated int32 input_ids = 4; 
+  repeated int32 input_mask = 5; 
+  repeated int32 segment_ids = 6;
+  optional BlockRelevance relevance = 7;
+  optional ExampleType example_type = 8;
+}
+
+message ExampleforRelevancePredictionDataset {
+  repeated ExampleforRelevancePrediction block_relevance_example = 1;
+}
+
+message ExampleforSpanPrediction {  
+  optional bytes query_id = 1; 
+  repeated bytes block_id = 2; 
+  repeated int32 input_ids = 3; 
+  repeated int32 input_mask = 4; 
+  repeated int32 segment_ids = 5; 
+  repeated int32 labels_ids = 6;
+  optional bool distributable = 7;
+  optional ExampleType example_type = 8;
+  optional bytes example_id = 9; 
+  optional int32 split_id = 10;
+  repeated int32 position_ids = 11;
+  repeated DataFlowEdges df_edges = 12;
+  optional int32 query_offset = 13;
+} 
+
+message ExampleforSpanPredictionDataset { 
+  repeated ExampleforSpanPrediction examples = 1;
+}

@@ -1,0 +1,23 @@
+You are an expert software developer. Please help identify the results of evaluating the CodeQL query titled "{{ query_name }}" on a code snippet. The results should be given as code spans or fragments (if any) from the code snippet. The description of the CodeQL query "{{ query_name }}" is - {{ description }}
+
+
+The results should consist of two parts: answer spans and supporting fact spans. If there are spans that match the query description, print them out as answer spans. Supporting fact spans are spans that provide additional evidence about the correctness of the answer spans. Always print one span per line. If no such spans exist, print N/A.
+
+
+The following are some examples of code snippets with spans matching the query description, along with supporting facts if any.
+{{example_sf_description}}
+
+{{example_a}}
+
+
+{{example_b}}
+
+
+Code snippet
+```python
+{{ input_code }}
+```
+
+
+Answer span(s)
+```python
