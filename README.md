@@ -1,11 +1,12 @@
 # CodeQueries Benchmark
 
-CodeQueries is a dataset to evaluate the ability of neural networks to answer semantic queries over code. Given a query and code, a model is expected to identify answer and supporting-fact spans in the code for the query. This is extractive question-answering over code, for questions with a large scope (entire files) and complexity including both single- and multi-hop reasoning. More details on the curated dataset for this benchmark are available on [huggingface](https://huggingface.co/datasets/thepurpleowl/codequeries).
+CodeQueries is a dataset to evaluate various methodologies on answering semantic queries over code. Existing datasets for question-answering in the context of programming languages target comparatively simpler tasks of predicting binary yes/no answers to a question or range over a localized context (e.g., a source-code method). In contrast, in CodeQueries, a source-code file is annotated with the required spans for a code analysis query about semantic aspects of code. Given a query and code, a `Span Predictor` system is expected to identify answer and supporting-fact spans in the code for the query. 
 
 <p align="center">
-    <img src="codequeries_instance.png"/>
+    <img src="QA_Task.png" alt="CodeQueries task definition" style="width: 70vw; min-width: 350px;"/>
 </p>
 
+More details on the curated dataset for this benchmark are available on [huggingface](https://huggingface.co/datasets/thepurpleowl/codequeries).
 The repo provides scripts to reproduce the results of NeurIPS dataset track [submission]().
 
 ### Steps
@@ -14,13 +15,15 @@ The repo provides scripts to reproduce the results of NeurIPS dataset track [sub
 2. Run `setup.sh` to setup the workspace.
 3. Run the following commands to get performance metric values.   
 
-#### To run Two-step setup evaluation
-`python3 evaluate_spanprediction.py --example_types_to_evaluate=<positive/negative> --setting=twostep --span_type=<both/answer/sf> --span_model_checkpoint_path=<model-ckpt-with-low-data/Cubert-1K-low-data/finetuned_ckpts/Cubert-1K> --relevance_model_checkpoint_path=<model-ckpt-with-low-data/Twostep_Relevance-512-low-data/finetuned_ckpts/Twostep_Relevance-512>`
+#### Two-step setup evaluation
+`python3 evaluate_spanprediction.py --example_types_to_evaluate=<positive/negative> --setting=twostep --span_type=<both/answer/sf> --span_model_checkpoint_path=<model-ckpt-with-low-data/Cubert-1K-low-data or finetuned_ckpts/Cubert-1K> --relevance_model_checkpoint_path=<model-ckpt-with-low-data/Twostep_Relevance-512-low-data or finetuned_ckpts/Twostep_Relevance-512>`
 
 
-#### To run LLM experiment Evaluation
-`python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
-`python evaluate_generated_spans.py --g=test_dir_file_fewshot_sf/logs --with_sf=True`
+#### LLM experiment Evaluation
+To evaluate zero-shot prompt: `python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
+To evaluate few-shot prompt with BM25 retrieval: `python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
+To evaluate few-shot prompt with supporting facts: `python evaluate_generated_spans.py --g=test_dir_file_fewshot_sf/logs --with_sf=True`
+
 
 ### Experiment results on sampled data
 -----------
