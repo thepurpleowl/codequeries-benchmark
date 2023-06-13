@@ -3,10 +3,10 @@
 CodeQueries is a dataset to evaluate various methodologies on answering semantic queries over code. Existing datasets for question-answering in the context of programming languages target comparatively simpler tasks of predicting binary yes/no answers to a question or range over a localized context (e.g., a source-code method). In contrast, in CodeQueries, a source-code file is annotated with the required spans for a code analysis query about semantic aspects of code. Given a query and code, a `Span Predictor` system is expected to identify answer and supporting-fact spans in the code for the query. 
 
 <p align="center">
-    <img src="QA_Task.png" alt="CodeQueries task definition" style="width: 70vw; min-width: 350px;"/>
+    <img src="QA_Task.png" alt="CodeQueries task definition" style="width: 70vw; min-width: 300px;"/>
 </p>
 
-More details on the curated dataset for this benchmark are available on [huggingface](https://huggingface.co/datasets/thepurpleowl/codequeries).
+More details on the curated dataset for this benchmark are available on [HuggingFace](https://huggingface.co/datasets/thepurpleowl/codequeries).
 The repo provides scripts to reproduce the results of NeurIPS dataset track [submission]().
 
 ### Steps
@@ -21,20 +21,20 @@ The repo provides scripts to reproduce the results of NeurIPS dataset track [sub
 
 #### LLM experiment Evaluation
 To evaluate zero-shot prompt: `python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
-To evaluate few-shot prompt with BM25 retrieval: `python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
+To evaluate few-shot prompt with BM25 retrieval: `python evaluate_generated_spans.py --g=test_dir_file_fewshot/logs`  
 To evaluate few-shot prompt with supporting facts: `python evaluate_generated_spans.py --g=test_dir_file_fewshot_sf/logs --with_sf=True`
 
 
-### Experiment results on sampled data
+### Experiment results on sampled test data
 -----------
 #### LLM experiment
 <table>
   <thead>
     <tr>
       <th></th>
-      <th colspan="2">Zero-shot prompting</th>
-      <th colspan="2">Few-shot prompting with BM25 retrieval</th>
-      <th> Few-shot prompting with supporting fact</th>
+      <th colspan="2">Zero-shot prompting <br>(Answer span prediction)</th>
+      <th colspan="2">Few-shot prompting with BM25 retrieval <br>(Answer span prediction)</th>
+      <th> Few-shot prompting with supporting fact <br>(Answer & supporting-fact span prediction)</th>
     </tr>
   </thead>
   <tbody>
@@ -124,3 +124,14 @@ To evaluate few-shot prompt with supporting facts: `python evaluate_generated_sp
   </tbody>
 </table>
 
+
+### Experiment results on complete test data
+-----------
+| Variants                      | Positive     | Negative     |
+|-------------------------------|--------------|--------------|
+| Two-step(20, 20)              | 3.74         | 95.54        |
+| Two-step(all, 20)             | 7.81         | 97.87        |
+| Two-step(20, all)             | 33.41        | 96.23        |
+| Two-step(all, all)            | 52.61        | 96.73        |
+| Prefix                        | 36.60        | 93.80        |
+| Sliding window                | 51.91        | 85.75        |
