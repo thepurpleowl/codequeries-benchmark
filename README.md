@@ -7,7 +7,7 @@ CodeQueries is a dataset to evaluate various methodologies on answering semantic
 </p>
 
 More details on the curated dataset for this benchmark are available on [HuggingFace](https://huggingface.co/datasets/thepurpleowl/codequeries).
-The repo provides scripts to reproduce the results of NeurIPS dataset track [submission]().
+The repo provides scripts to reproduce the results presented in the paper on [CodeQueries]().
 
 ### Steps
 -----------
