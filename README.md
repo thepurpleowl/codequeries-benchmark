@@ -7,7 +7,7 @@ CodeQueries is a dataset to evaluate various methodologies on answering semantic
 </p>
 
 More details on the curated dataset for this benchmark are available on [HuggingFace](https://huggingface.co/datasets/thepurpleowl/codequeries).
-The repo provides scripts to reproduce the results of NeurIPS dataset track [submission]().
+The repo provides scripts to reproduce the results of the paper on [CodeQueries]().
 
 ### Steps
 -----------
@@ -15,14 +15,14 @@ The repo provides scripts to reproduce the results of NeurIPS dataset track [sub
 2. Run `setup.sh` to setup the workspace.
 3. Run the following commands to get performance metric values.   
 
+#### LLM experiment evaluation
+* To evaluate zero-shot prompt: `python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
+* To evaluate few-shot prompt with BM25 retrieval: `python evaluate_generated_spans.py --g=test_dir_file_fewshot/logs`  
+* To evaluate few-shot prompt with supporting facts: `python evaluate_generated_spans.py --g=test_dir_file_fewshot_sf/logs --with_sf=True`
+
+
 #### Two-step setup evaluation
 `python3 evaluate_spanprediction.py --example_types_to_evaluate=<positive/negative> --setting=twostep --span_type=<both/answer/sf> --span_model_checkpoint_path=<model-ckpt-with-low-data/Cubert-1K-low-data or finetuned_ckpts/Cubert-1K> --relevance_model_checkpoint_path=<model-ckpt-with-low-data/Twostep_Relevance-512-low-data or finetuned_ckpts/Twostep_Relevance-512>`
-
-
-#### LLM experiment Evaluation
-To evaluate zero-shot prompt: `python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
-To evaluate few-shot prompt with BM25 retrieval: `python evaluate_generated_spans.py --g=test_dir_file_fewshot/logs`  
-To evaluate few-shot prompt with supporting facts: `python evaluate_generated_spans.py --g=test_dir_file_fewshot_sf/logs --with_sf=True`
 
 
 ### Experiment results on sampled test data
