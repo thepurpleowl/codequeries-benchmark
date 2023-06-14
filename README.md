@@ -19,15 +19,20 @@ The repo provides scripts to evaluate the dataset for LLM generations and in a t
 #### LLM experiment evaluation
 -----------
 We have used the GPT3.5-Turbo model from OpenAI with different prompt templates (provided at `/prompt_templates`) to generate required answer and supporting-fact spans for a query. We generate 10 samples for each input and the generated results downloaded as a part of setup. Following scripts can be used to evaluate the LLM results with diffrerent prompts.  
-To evaluate zero-shot prompt: `python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
-To evaluate few-shot prompt with BM25 retrieval: `python evaluate_generated_spans.py --g=test_dir_file_fewshot/logs`  
-To evaluate few-shot prompt with supporting facts: `python evaluate_generated_spans.py --g=test_dir_file_fewshot_sf/logs --with_sf=True`
+To evaluate zero-shot prompt,  
+&nbsp;&nbsp;&nbsp;&nbsp;`python evaluate_generated_spans.py --g=test_dir_file_0shot/logs`  
+To evaluate few-shot prompt with BM25 retrieval,  
+&nbsp;&nbsp;&nbsp;&nbsp;`python evaluate_generated_spans.py --g=test_dir_file_fewshot/logs`  
+To evaluate few-shot prompt with supporting facts,  
+&nbsp;&nbsp;&nbsp;&nbsp;`python evaluate_generated_spans.py --g=test_dir_file_fewshot_sf/logs --with_sf=True`
 
 #### Two-step setup evaluation
 -----------
 In many cases, the entire file contents do not fit in the input to the model. However, not all code is relevant for answering a given query. We identify the relevant code blocks using the CodeQL results during data preparation and implement a two-step procedure to deal with the problem of scaling to large-size code:  
-&nbsp;&nbsp;&nbsp;&nbsp;Step 1: We first apply a relevance classifier to every block in the given code and select code blocksthat are likely to be relevant for answering a given query.  
+&nbsp;&nbsp;&nbsp;&nbsp;Step 1: We first apply a relevance classifier to every block in the given code and select code blocks that are likely to be relevant for answering a given query.  
 &nbsp;&nbsp;&nbsp;&nbsp;Step 2: We then apply the span prediction model to the set of selected code blocks to predict answer and supporting-fact spans.  
+
+To evaluate the two-step setup, run  
 `python3 evaluate_spanprediction.py --example_types_to_evaluate=<positive/negative> --setting=twostep --span_type=<both/answer/sf> --span_model_checkpoint_path=<model-ckpt-with-low-data/Cubert-1K-low-data or finetuned_ckpts/Cubert-1K> --relevance_model_checkpoint_path=<model-ckpt-with-low-data/Twostep_Relevance-512-low-data or finetuned_ckpts/Twostep_Relevance-512>`
 
 
