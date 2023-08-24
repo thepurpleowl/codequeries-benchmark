@@ -5,8 +5,31 @@ import numpy as np
 import argparse
 import os
 import csv
+from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction
+smoothing_fn = SmoothingFunction()
+
+
 # from difflib import SequenceMatcher
 __FILE_DIR__ = Path(__file__).parent
+nck_dict = {}
+
+
+def power_set(k):
+    n = 10
+    for i in range(2**n):
+        combo = []
+        for j in range(n):
+            if (i >> j) % 2 == 1:
+                combo.append(j)
+        if len(combo) == k:
+            yield combo
+
+
+def build_nck():
+    nck_dict = {}  # for nCk
+    for k in [1, 2, 5, 10]:
+        nck_dict[k] = list(power_set(k))
+    return nck_dict
 
 
 def cal_pass_at_k(n, c, k):
@@ -55,12 +78,40 @@ def multispan_eq(actual_spans, spans):
     return 1
 
 
+def score_at_k(actual_spans, generated_spans, k):
+    # print('Actual :', actual_spans)
+    # print(generated_spans)
+    # print('-'*50, len(generated_spans))
+
+    sentence_bleu = 0
+    for selected_indices in nck_dict[k]:
+        selected_gen_spans = []
+        for index in selected_indices:
+            selected_gen_spans.append(generated_spans[index])
+
+        bleu_scores = []
+        for span in selected_gen_spans:
+            candidate = span.split()
+            reference = []
+            for x in actual_spans.split(':::-:::'):
+                reference.extend(x.split())
+            bleu_scores.append(corpus_bleu([[reference]], [candidate],
+                                           weights=(0.25, 0.25, 0.25, 0.25),
+                                           smoothing_function=smoothing_fn.method2))
+        # get max bleu from this combination
+        sentence_bleu += max(bleu_scores)
+
+    # normalize
+    return sentence_bleu / len(nck_dict[k])
+
+
 def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10):
     pass_at_k = 0
     total = 0
     _cols_ = ['i', 'query', 'file_path', 'prompt', 'ans_spans']
     _cols_.extend([f'ans_{i}' for i in range(n)])
     querywise_em = {}
+    corpus_sentence_bleu = 0
     for query in all_queries:
         prev_pass_at_k = pass_at_k
         try:
@@ -82,12 +133,20 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10
             pass_cnt = 0
             actual_spans = row['ans_spans']
             gen_spans = [row[x] for x in [f'ans_{i}' for i in range(n)] if row[x].strip()]
+            bleu_gen_spans = [row[x] for x in [f'ans_{i}' for i in range(n)]]
 
+            # bleu
+            corpus_sentence_bleu += score_at_k(actual_spans, bleu_gen_spans, k)
+            prev_pass_cnt = pass_cnt
             for spans in gen_spans:
                 if len(actual_spans.split(':::-:::')) == 1:
                     pass_cnt += singlespan_eq(actual_spans, spans)
                 else:
                     pass_cnt += multispan_eq(actual_spans, spans)
+                if (k == 10 and example_type == 'negative' and pass_cnt > prev_pass_cnt
+                        and 'Inconsistent' in query):
+                    print(row['query'], row['file_path'])
+                prev_pass_cnt = pass_cnt
             assert pass_cnt <= 10
 
             # calculate pass@k
@@ -95,7 +154,40 @@ def pass_at_k(log_path, all_queries, query_folderName_map, k, example_type, n=10
         querywise_em[query] = (pass_at_k - prev_pass_at_k, df.shape[0])
     print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
 
+    # # bleu
+    # print(len(references), len(candidates), total)
+    # # assert len(references) == len(candidates) == total
+    # corpus_bleu_score = corpus_bleu(references, candidates,
+    #                                 weights=(0.25, 0.25, 0.25, 0.25),
+    #                                 smoothing_function=smoothing_fn.method2)
+
+    # print('Corpus BLEU: ', corpus_bleu_score / total)
+    print('Sentence BLEU: ', corpus_sentence_bleu / total)
     return querywise_em
+
+
+def get_combined_spans(gen_spans):
+    bleu_gen_spans = []
+    for span in gen_spans:
+        temp_span = ''
+        try:
+            gen_ans_spans = span.split('Supporting fact span(s)\n```python')[0].strip().strip('```').strip()
+            temp_span += gen_ans_spans
+        except IndexError:
+            pass
+
+        try:
+            gen_sf_spans = span.split('Supporting fact span(s)\n```python')[1].strip()
+            if not temp_span:
+                temp_span += gen_sf_spans
+            else:
+                temp_span += ' ' + gen_sf_spans
+        except IndexError:
+            pass
+
+        bleu_gen_spans.append(temp_span)
+
+    return bleu_gen_spans
 
 
 def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
@@ -104,6 +196,8 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
     _cols_ = ['i', 'query', 'file_path', 'prompt', 'ans_spans', 'sf_spans']
     _cols_.extend([f'ans_{i}' for i in range(n)])
     querywise_em = {}
+    corpus_sentence_bleu = 0
+    corpus_sentence_bleu = 0
     for query in all_queries:
         prev_pass_at_k = pass_at_k
         try:
@@ -121,6 +215,12 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
             actual_sf_spans = row['sf_spans']
             gen_spans = [row[x] for x in [f'ans_{i}' for i in range(n)] if row[x].strip()]
 
+            # bleu
+            bleu_actual_spans = ':::-:::'.join([actual_ans_spans, actual_sf_spans])
+            bleu_gen_spans = get_combined_spans(gen_spans)
+            corpus_sentence_bleu += score_at_k(bleu_actual_spans, bleu_gen_spans, k)
+
+            prev_pass_cnt = pass_cnt
             for _, spans in enumerate(gen_spans):
                 try:
                     gen_ans_spans = spans.split('Supporting fact span(s)\n```python')[0].strip().strip('```').strip()
@@ -143,12 +243,17 @@ def pass_at_k_with_sf(log_path, all_queries, query_folderName_map, k, n=10):
 
                 if ans_em and sf_em:
                     pass_cnt += 1
+                # if (k == 10 and pass_cnt > prev_pass_cnt
+                #         and 'Inconsistent' in query):
+                #     print(row['query'], row['file_path'])
+                prev_pass_cnt = pass_cnt
             assert pass_cnt <= 10
 
             # calculate pass@k
             pass_at_k += cal_pass_at_k(n, pass_cnt, k)
         querywise_em[query] = (pass_at_k - prev_pass_at_k, df.shape[0])
     print(f"Correct with pass@{k}: {pass_at_k}/{total} = {pass_at_k/total}")
+    print('Sentence BLEU: ', corpus_sentence_bleu / total)
 
     return querywise_em
 
@@ -175,6 +280,7 @@ if __name__ == "__main__":
     parser.add_argument("--with_sf", type=bool, default=False)
     parser.add_argument("--querywise", type=bool, default=False)
 
+    nck_dict = build_nck()
     args = parser.parse_args()
     if args.with_sf:
         print('-' * 50, ' Positive ', '-' * 50)
