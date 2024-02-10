@@ -7,7 +7,8 @@ CodeQueries is a dataset to evaluate various methodologies on answering semantic
 </p>
 
 
-The dataset statistics and some additional results are provided in the [Codequeries_Statistics](https://github.com/thepurpleowl/codequeries-benchmark/blob/main/Codequeries_Statistics.pdf) file.  
+The dataset statistics and some additional results are provided in the [Codequeries_Statistics](https://github.com/thepurpleowl/codequeries-benchmark/blob/main/Codequeries_Statistics.pdf) file. [Here](https://github.com/thepurpleowl/codequeries-benchmark/blob/main/using_CodeQueries.ipynb) is the starter code to get started with the dataset.
+
 More details on the curated dataset for this benchmark are available on [HuggingFace](https://huggingface.co/datasets/thepurpleowl/codequeries).
 
 ### Steps
