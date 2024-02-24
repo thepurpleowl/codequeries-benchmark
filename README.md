@@ -1,3 +1,5 @@
+### The work is accepted in `ISEC 2024` and is now available in the [ACM Digital Library](doi.acm.org?doi=3641399.3641408).
+
 # CodeQueries Benchmark
 
 CodeQueries is a dataset to evaluate various methodologies on answering semantic queries over code. Existing datasets for question-answering in the context of programming languages target comparatively simpler tasks of predicting binary yes/no answers to a question or range over a localized context (e.g., a source-code method). In contrast, in CodeQueries, a source-code file is annotated with the required spans for a code analysis query about semantic aspects of code. Given a query and code, a `Span Predictor` system is expected to identify answer and supporting-fact spans in the code for the query. 
