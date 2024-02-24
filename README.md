@@ -1,4 +1,4 @@
-### The work is accepted in `ISEC 2024` and is now available in the [ACM Digital Library](doi.acm.org?doi=3641399.3641408).
+### The work is accepted in `ISEC 2024` and is now available in the [ACM Digital Library](https://dl.acm.org/doi/10.1145/3641399.3641408).
 
 # CodeQueries Benchmark
 
